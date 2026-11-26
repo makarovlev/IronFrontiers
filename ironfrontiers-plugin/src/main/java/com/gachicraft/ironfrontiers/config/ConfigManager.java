@@ -1,5 +1,6 @@
 package com.gachicraft.ironfrontiers.config;
 
+import com.gachicraft.ironfrontiers.integration.MythicBridge;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -19,9 +20,13 @@ public final class ConfigManager {
     private static final Set<String> RESTART_EXACT = Set.of("war_worlds");
     private static final Set<String> RELOADABLE_TRANSFORM_KEYS = Set.of("transform.tick_budget_ms", "transform.min_tps");
     private final JavaPlugin plugin;
+    private final MythicBridge mythicBridge;
     private YamlConfiguration config, messages, sectors, mobs, blueprints, menus;
 
-    public ConfigManager(JavaPlugin plugin) { this.plugin = Objects.requireNonNull(plugin); }
+    public ConfigManager(JavaPlugin plugin) {
+        this.plugin = Objects.requireNonNull(plugin);
+        this.mythicBridge = new MythicBridge(plugin.getServer().getPluginManager());
+    }
 
     public ReloadReport loadInitial() {
         createResources();
@@ -105,33 +110,95 @@ public final class ConfigManager {
         if(!Set.of("MIN_X_TO_MAX_X","MAX_X_TO_MIN_X","MIN_Z_TO_MAX_Z","MAX_Z_TO_MIN_Z").contains(direction)){w.add("transform.direction: unknown value; using MIN_X_TO_MAX_X");y.set("transform.direction","MIN_X_TO_MAX_X");}
     }
 
-    private void validateMobs(YamlConfiguration yaml,List<String>warnings){
-        ConfigurationSection clusters=yaml.getConfigurationSection("clusters");
-        if(clusters==null){warnings.add("clusters: section missing; no mob clusters will be loaded");return;}
-        for(String id:clusters.getKeys(false)){
-            ConfigurationSection cluster=clusters.getConfigurationSection(id);
-            if(cluster==null){warnings.add("clusters."+id+": not a section; ignored");continue;}
-            int total=0;boolean invalid=false;
-            for(String entryId:cluster.getKeys(false)){
-                String path="clusters."+id+"."+entryId;
-                ConfigurationSection entry=cluster.getConfigurationSection(entryId);
-                if(entry==null){invalid=true;warnings.add(path+": expected section");continue;}
-                String type=entry.getString("type","").toUpperCase(Locale.ROOT);
-                if(!Set.of("VANILLA","MYTHICMOBS").contains(type)){invalid=true;warnings.add(path+".type: expected VANILLA or MYTHICMOBS");}
-                if(!entry.isString("mob")||entry.getString("mob","").isBlank()){invalid=true;warnings.add(path+".mob: missing id");}
-                int amount=entry.getInt("amount",0);
-                if(amount<1||amount>10){invalid=true;warnings.add(path+".amount: expected 1..10");}else total+=amount;
-                if("MYTHICMOBS".equals(type)){
-                    ConfigurationSection level=entry.getConfigurationSection("level");
-                    if(level==null||!level.isInt("min")||level.getInt("min")<1){invalid=true;warnings.add(path+".level.min: required positive integer for MYTHICMOBS");}
+    private void validateMobs(YamlConfiguration yaml, List<String> warnings) {
+        ConfigurationSection clusters = yaml.getConfigurationSection("clusters");
+        if (clusters == null) {
+            warnings.add("clusters: section missing; no mob clusters will be loaded");
+            return;
+        }
+
+        Map<String, MythicBridge.MobLookup> mythicLookups = new HashMap<>();
+        for (String id : clusters.getKeys(false)) {
+            ConfigurationSection cluster = clusters.getConfigurationSection(id);
+            if (cluster == null) {
+                warnings.add("clusters." + id + ": not a section; ignored");
+                continue;
+            }
+
+            int total = 0;
+            boolean invalid = false;
+            for (String entryId : cluster.getKeys(false)) {
+                String path = "clusters." + id + "." + entryId;
+                ConfigurationSection entry = cluster.getConfigurationSection(entryId);
+                if (entry == null) {
+                    invalid = true;
+                    warnings.add(path + ": expected section");
+                    continue;
                 }
-                if(entry.contains("weight")){
-                    double weight=entry.getDouble("weight",-1);
-                    if(!Double.isFinite(weight)||weight<0||Math.abs(weight*10-Math.rint(weight*10))>1.0E-7){invalid=true;warnings.add(path+".weight: expected non-negative with at most one decimal");}
+
+                String type = entry.getString("type", "").toUpperCase(Locale.ROOT);
+                if (!Set.of("VANILLA", "MYTHICMOBS").contains(type)) {
+                    invalid = true;
+                    warnings.add(path + ".type: expected VANILLA or MYTHICMOBS");
+                }
+
+                String mobId = entry.getString("mob", "");
+                if (mobId.isBlank()) {
+                    invalid = true;
+                    warnings.add(path + ".mob: missing id");
+                }
+
+                int amount = entry.getInt("amount", 0);
+                if (amount < 1 || amount > 10) {
+                    invalid = true;
+                    warnings.add(path + ".amount: expected 1..10");
+                } else {
+                    total += amount;
+                }
+
+                if ("MYTHICMOBS".equals(type)) {
+                    ConfigurationSection level = entry.getConfigurationSection("level");
+                    if (level == null || !level.isInt("min") || level.getInt("min") < 1) {
+                        invalid = true;
+                        warnings.add(path + ".level.min: required positive integer for MYTHICMOBS");
+                    }
+
+                    if (!mobId.isBlank()) {
+                        MythicBridge.MobLookup lookup = mythicLookups.computeIfAbsent(
+                                mobId, mythicBridge::validateMobId);
+                        switch (lookup) {
+                            case NOT_FOUND -> {
+                                invalid = true;
+                                warnings.add(path + ".mob: MythicMobs mob id '" + mobId + "' was not found");
+                            }
+                            case PLUGIN_MISSING -> {
+                                invalid = true;
+                                warnings.add(path + ".mob: MythicMobs is not installed; this cluster is disabled");
+                            }
+                            case API_UNSUPPORTED -> warnings.add(
+                                    path + ".mob: MythicMobs API lookup is unavailable for the installed version; id validation was skipped");
+                            case FOUND -> { }
+                        }
+                    }
+                }
+
+                if (entry.contains("weight")) {
+                    double weight = entry.getDouble("weight", -1);
+                    if (!Double.isFinite(weight) || weight < 0
+                            || Math.abs(weight * 10 - Math.rint(weight * 10)) > 1.0E-7) {
+                        invalid = true;
+                        warnings.add(path + ".weight: expected non-negative with at most one decimal");
+                    }
                 }
             }
-            if(total>10){invalid=true;warnings.add("clusters."+id+": total amount exceeds 10");}
-            if(invalid)warnings.add("clusters."+id+": invalid cluster will be disabled; other clusters remain available");
+
+            if (total > 10) {
+                invalid = true;
+                warnings.add("clusters." + id + ": total amount exceeds 10");
+            }
+            if (invalid) {
+                warnings.add("clusters." + id + ": invalid cluster will be disabled; other clusters remain available");
+            }
         }
     }
     private void validateInt(YamlConfiguration y,String p,int min,int max,int fallback,List<String>w){if(!y.isInt(p)||y.getInt(p)<min||y.getInt(p)>max){w.add(p+": invalid value; using "+fallback);y.set(p,fallback);}}
