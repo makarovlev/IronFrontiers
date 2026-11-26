@@ -38,6 +38,7 @@ public final class ConfigManager {
         blueprints = load("blueprints.yml", warnings);
         menus = load("menus.yml", warnings);
         validateConfig(config, warnings);
+        validateMessages(messages, warnings);
         validateMobs(mobs, warnings);
         logWarnings(warnings);
         return new ReloadReport(List.of(), warnings);
@@ -52,6 +53,7 @@ public final class ConfigManager {
         YamlConfiguration nextBlueprints = load("blueprints.yml", warnings);
         YamlConfiguration nextMenus = load("menus.yml", warnings);
         validateConfig(nextConfig, warnings);
+        validateMessages(nextMessages, warnings);
         validateMobs(nextMobs, warnings);
         List<String> restart = new ArrayList<>();
         preserveRestartValues(config, nextConfig, restart);
@@ -108,6 +110,26 @@ public final class ConfigManager {
         if(!y.isList("war_worlds")||y.getStringList("war_worlds").isEmpty()){w.add("war_worlds: expected non-empty list; using [world_war]");y.set("war_worlds",List.of("world_war"));}
         String direction=y.getString("transform.direction","MIN_X_TO_MAX_X");
         if(!Set.of("MIN_X_TO_MAX_X","MAX_X_TO_MIN_X","MIN_Z_TO_MAX_Z","MAX_Z_TO_MIN_Z").contains(direction)){w.add("transform.direction: unknown value; using MIN_X_TO_MAX_X");y.set("transform.direction","MIN_X_TO_MAX_X");}
+    }
+
+    private void validateMessages(YamlConfiguration yaml, List<String> warnings) {
+        for (String path : yaml.getKeys(true)) {
+            if (yaml.isConfigurationSection(path)) {
+                continue;
+            }
+            if (!yaml.isString(path)) {
+                warnings.add("messages." + path + ": expected string; the invalid message is disabled");
+                yaml.set(path, "");
+            }
+        }
+
+        for (String required : List.of("general.prefix", "general.no_permission",
+                "general.unknown_subcommand", "general.reload_done",
+                "general.reload_restart_required")) {
+            if (!yaml.isString(required)) {
+                warnings.add("messages." + required + ": required message is missing or invalid");
+            }
+        }
     }
 
     private void validateMobs(YamlConfiguration yaml, List<String> warnings) {
