@@ -1,0 +1,212 @@
+package com.gachicraft.ironfrontiers.config;
+
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.logging.Level;
+
+/** Loads, creates and validates the six documented YAML files. */
+public final class ConfigManager {
+    private static final List<String> RESOURCE_FILES = List.of(
+            "config.yml", "messages.yml", "sectors.yml", "mobs.yml", "blueprints.yml", "menus.yml");
+    private static final List<String> RESTART_PREFIXES = List.of("database.", "multiserver.", "transform.", "stronghold.npc_parking.");
+    private static final Set<String> RESTART_EXACT = Set.of("war_worlds");
+    private static final Set<String> RELOADABLE_TRANSFORM_KEYS = Set.of("transform.tick_budget_ms", "transform.min_tps");
+    private final JavaPlugin plugin;
+    private YamlConfiguration config, messages, sectors, mobs, blueprints, menus;
+
+    public ConfigManager(JavaPlugin plugin) { this.plugin = Objects.requireNonNull(plugin); }
+
+    public ReloadReport loadInitial() {
+        createResources();
+        List<String> warnings = new ArrayList<>();
+        config = load("config.yml", warnings);
+        messages = load("messages.yml", warnings);
+        sectors = load("sectors.yml", warnings);
+        mobs = load("mobs.yml", warnings);
+        blueprints = load("blueprints.yml", warnings);
+        menus = load("menus.yml", warnings);
+        validateConfig(config, warnings);
+        validateMobs(mobs, warnings);
+        logWarnings(warnings);
+        return new ReloadReport(List.of(), warnings);
+    }
+
+    public ReloadReport reload() {
+        List<String> warnings = new ArrayList<>();
+        YamlConfiguration candidateConfig = load("config.yml", warnings);
+        YamlConfiguration candidateMessages = load("messages.yml", warnings);
+        YamlConfiguration candidateSectors = load("sectors.yml", warnings);
+        YamlConfiguration candidateMobs = load("mobs.yml", warnings);
+        YamlConfiguration candidateBlueprints = load("blueprints.yml", warnings);
+        YamlConfiguration candidateMenus = load("menus.yml", warnings);
+        validateConfig(candidateConfig, warnings);
+        validateMobs(candidateMobs, warnings);
+        List<String> restart = new ArrayList<>();
+        preserveRestartValues(config, candidateConfig, restart);
+        preserveSectorRestartValues(sectors, candidateSectors, restart);
+        config = candidateConfig;
+        messages = candidateMessages;
+        sectors = candidateSectors;
+        mobs = candidateMobs;
+        blueprints = candidateBlueprints;
+        menus = candidateMenus;
+        logWarnings(warnings);
+        return new ReloadReport(restart, warnings);
+    }
+
+    private void createResources() {
+        if (!plugin.getDataFolder().exists() && !plugin.getDataFolder().mkdirs()) {
+            throw new IllegalStateException("Cannot create plugin data directory");
+        }
+        for (String resource : RESOURCE_FILES) {
+            if (!new File(plugin.getDataFolder(), resource).exists()) {
+                try { plugin.saveResource(resource, false); }
+                catch (IllegalArgumentException exception) {
+                    throw new IllegalStateException("Missing embedded resource " + resource, exception);
+                }
+            }
+        }
+        for (String directory : List.of("blueprints", "data")) {
+            File folder = new File(plugin.getDataFolder(), directory);
+            if (!folder.exists() && !folder.mkdirs()) throw new IllegalStateException("Cannot create " + folder);
+        }
+    }
+
+    private YamlConfiguration load(String name, List<String> warnings) {
+        File file = new File(plugin.getDataFolder(), name);
+        YamlConfiguration yaml = new YamlConfiguration();
+        try { yaml.load(file); }
+        catch (Exception exception) {
+            warnings.add(name + ": " + exception.getMessage() + "; embedded defaults are being used");
+        }
+        try (var stream = plugin.getResource(name)) {
+            if (stream != null) {
+                YamlConfiguration defaults = YamlConfiguration.loadConfiguration(
+                        new InputStreamReader(stream, StandardCharsets.UTF_8));
+                yaml.setDefaults(defaults);
+                yaml.options().copyDefaults(true);
+            }
+        } catch (IOException exception) {
+            plugin.getLogger().log(Level.SEVERE, "Cannot load embedded defaults for " + name, exception);
+        }
+        return yaml;
+    }
+
+    private void validateConfig(YamlConfiguration yaml, List<String> warnings) {
+        validateInt(yaml,"database.port",1,65535,3306,warnings);
+        validateInt(yaml,"database.pool_size",1,64,6,warnings);
+        validateInt(yaml,"kpm.update_interval_seconds",1,60,1,warnings);
+        validateInt(yaml,"kpm.window_seconds",1,3600,60,warnings);
+        validateInt(yaml,"spawn.max_alive_clusters_per_sector",1,100,3,warnings);
+        validateInt(yaml,"spawn.max_alive_clusters_total",1,200,6,warnings);
+        validateInt(yaml,"spawn.despawn_spread_ticks",5,10,8,warnings);
+        validateInt(yaml,"transform.scan_threads",1,32,2,warnings);
+        validateInt(yaml,"stronghold.max_blocks_per_tick",1,100000,2000,warnings);
+        validateInt(yaml,"placeholders.kpm_decimals",0,3,1,warnings);
+        validateDouble(yaml,"sector_defaults.kpm_capture",0.1,100000,45,warnings);
+        validateDouble(yaml,"sector_defaults.kpm_held",0.1,100000,23,warnings);
+        validateDouble(yaml,"transform.tick_budget_ms",0.1,50,2,warnings);
+        validateDouble(yaml,"transform.min_tps",1,20,18,warnings);
+        validateString(yaml,"database.host","127.0.0.1",warnings);
+        validateString(yaml,"database.name","ironfrontiers",warnings);
+        validateString(yaml,"database.user","root",warnings);
+        validateString(yaml,"database.table_prefix","if_",warnings);
+        String prefix = yaml.getString("database.table_prefix","if_");
+        if (prefix == null || !prefix.matches("[A-Za-z0-9_]{1,24}")) {
+            warnings.add("database.table_prefix: invalid SQL identifier; using if_"); yaml.set("database.table_prefix","if_");
+        }
+        validateString(yaml,"multiserver.server_id","server_1",warnings);
+        if (!yaml.isList("war_worlds") || yaml.getStringList("war_worlds").isEmpty()) {
+            warnings.add("war_worlds: expected non-empty list; using [world_war]"); yaml.set("war_worlds",List.of("world_war"));
+        }
+        String direction = yaml.getString("transform.direction","MIN_X_TO_MAX_X");
+        if (!Set.of("MIN_X_TO_MAX_X","MAX_X_TO_MIN_X","MIN_Z_TO_MAX_Z","MAX_Z_TO_MIN_Z").contains(direction)) {
+            warnings.add("transform.direction: unknown value; using MIN_X_TO_MAX_X"); yaml.set("transform.direction","MIN_X_TO_MAX_X");
+        }
+    }
+
+    private void validateMobs(YamlConfiguration yaml, List<String> warnings) {
+        ConfigurationSection clusters = yaml.getConfigurationSection("clusters");
+        if (clusters == null) { warnings.add("clusters: section missing; no mob clusters will be loaded"); return; }
+        for (String id : clusters.getKeys(false)) {
+            ConfigurationSection cluster = clusters.getConfigurationSection(id);
+            if (cluster == null) { warnings.add("clusters." + id + ": not a section; ignored"); continue; }
+            int total = 0; boolean invalid = false;
+            for (String entryId : cluster.getKeys(false)) {
+                String path = "clusters." + id + "." + entryId;
+                ConfigurationSection entry = cluster.getConfigurationSection(entryId);
+                if (entry == null) { invalid = true; warnings.add(path + ": expected section"); continue; }
+                String type = entry.getString("type","").toUpperCase(Locale.ROOT);
+                if (!Set.of("VANILLA","MYTHICMOBS").contains(type)) { invalid = true; warnings.add(path + ".type: expected VANILLA or MYTHICMOBS"); }
+                if (!entry.isString("mob") || entry.getString("mob","").isBlank()) { invalid = true; warnings.add(path + ".mob: missing id"); }
+                int amount = entry.getInt("amount",0);
+                if (amount < 1 || amount > 10) { invalid = true; warnings.add(path + ".amount: expected 1..10"); }
+                else total += amount;
+                if ("MYTHICMOBS".equals(type) && !entry.isConfigurationSection("level")) {
+                    invalid = true; warnings.add(path + ".level: required for MYTHICMOBS");
+                }
+                if (entry.contains("weight")) {
+                    double weight = entry.getDouble("weight",-1);
+                    if (!Double.isFinite(weight) || weight < 0 || Math.abs(weight * 10 - Math.rint(weight * 10)) > 1.0E-7) {
+                        invalid = true; warnings.add(path + ".weight: expected non-negative with at most one decimal");
+                    }
+                }
+            }
+            if (total > 10) { invalid = true; warnings.add("clusters." + id + ": total amount exceeds 10"); }
+            if (invalid) warnings.add("clusters." + id + ": invalid cluster will be disabled; other clusters remain available");
+        }
+    }
+
+    private void validateInt(YamlConfiguration y,String p,int min,int max,int fallback,List<String> w) {
+        if (!y.isInt(p) || y.getInt(p) < min || y.getInt(p) > max) { w.add(p + ": invalid value; using " + fallback); y.set(p,fallback); }
+    }
+    private void validateDouble(YamlConfiguration y,String p,double min,double max,double fallback,List<String> w) {
+        if (!y.isDouble(p) && !y.isInt(p)) { w.add(p + ": expected number; using " + fallback); y.set(p,fallback); return; }
+        double value=y.getDouble(p);
+        if (!Double.isFinite(value) || value < min || value > max) { w.add(p + ": out of range; using " + fallback); y.set(p,fallback); }
+    }
+    private void validateString(YamlConfiguration y,String p,String fallback,List<String> w) {
+        if (!y.isString(p) || y.getString(p,"").isBlank()) { w.add(p + ": expected non-empty string; using default"); y.set(p,fallback); }
+    }
+
+    private void preserveRestartValues(YamlConfiguration old,YamlConfiguration next,List<String> changed) {
+        Set<String> paths=new TreeSet<>(); collectPaths(old,"",paths); collectPaths(next,"",paths);
+        for (String path:paths) {
+            boolean restart=RESTART_EXACT.contains(path) || RESTART_PREFIXES.stream().anyMatch(path::startsWith)
+                    || (path.startsWith("transform.") && !RELOADABLE_TRANSFORM_KEYS.contains(path));
+            if (restart && !Objects.equals(old.get(path),next.get(path))) { next.set(path,old.get(path)); changed.add(path); }
+        }
+    }
+    private void preserveSectorRestartValues(YamlConfiguration old,YamlConfiguration next,List<String> changed) {
+        if (old == null) return;
+        Set<String> ids=new TreeSet<>();
+        ConfigurationSection a=old.getConfigurationSection("sectors"), b=next.getConfigurationSection("sectors");
+        if (a!=null) ids.addAll(a.getKeys(false)); if (b!=null) ids.addAll(b.getKeys(false));
+        for (String id:ids) for (String field:List.of("world","coords","replaces","stronghold.blueprint",
+                "stronghold.center","stronghold.npc","stronghold.npc_coord")) {
+            String path="sectors."+id+"."+field;
+            if (!Objects.equals(old.get(path),next.get(path))) { next.set(path,old.get(path)); changed.add(path); }
+        }
+    }
+    private void collectPaths(ConfigurationSection s,String prefix,Set<String> paths) {
+        for (String key:s.getKeys(false)) {
+            String path=prefix.isEmpty()?key:prefix+"."+key;
+            if (s.isConfigurationSection(key)) collectPaths(s.getConfigurationSection(key),path,paths);
+            else paths.add(path);
+        }
+    }
+    private void logWarnings(List<String> warnings) { for(String warning:warnings) plugin.getLogger().warning("Configuration: "+warning); }
+    public YamlConfiguration config(){return config;}
+    public YamlConfiguration messages(){return messages;}
+    public YamlConfiguration sectors(){return sectors;}
+    public YamlConfiguration mobs(){return mobs;}
+    public YamlConfiguration blueprints(){return blueprints;}
+    public YamlConfiguration menus(){return menus;}
+}

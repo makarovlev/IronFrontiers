@@ -1,6 +1,5 @@
-# Кластеры мобов. Тип: VANILLA или MYTHICMOBS.
-# Сумма amount в одном кластере не может превышать 10.
-# Для MYTHICMOBS обязателен level.min; PlaceholderAPI раскрывает scale для игрока.
+# Кластеры мобов: VANILLA или MYTHICMOBS; сумма amount не более 10.
+# Для MYTHICMOBS обязателен level.min; scale может содержать PlaceholderAPI.
 clusters:
   zombies_a:
     1:
@@ -13,7 +12,7 @@ clusters:
       mob: SKELETON
       amount: 1
       weight: 1.0
-  # Пример MythicMobs:
+  # Пример:
   # scavengers:
   #   1:
   #     type: MYTHICMOBS

@@ -1,10 +1,10 @@
 # ЧЕРТЕЖИ ФОРПОСТОВ
-# Внутренние координаты: "0,0,0" — центральный блок, который будет размещён
-# в sectors.<id>.stronghold.center. +X — вправо по X, +Y — выше, +Z — вперёд.
-# Значение — ванильный Bukkit BlockData, например oak_log[axis=y] или stone_bricks.
-# Допускаются только блоки с коллизией без block entity. AIR разрешён только в
-# broken_strongholds. link связывает обычный чертёж со схемой разрушения.
-# Для создания чертежа используйте /if blueprint export (этап 3).
+# Внутренняя координата "0,0,0" — блок, размещаемый в stronghold.center сектора.
+# +X — вправо по X, +Y — вверх, +Z — вперёд; отрицательные координаты допустимы.
+# Значение — ванильный Bukkit BlockData: oak_log[axis=y], stone_bricks и т.п.
+# Допускаются блоки с коллизией без block entity. AIR — только в broken_strongholds.
+# link связывает обычный чертёж со схемой разрушения.
+# Конвертер WorldEdit: /if blueprint export (будет добавлен на этапе 3).
 blueprints:
   bp_example:
     link: broken_example

@@ -1,13 +1,8 @@
-# =============================================================================
-# Iron Frontiers — основные настройки
-# Изменения параметров, помеченных [требует рестарта], применяются после рестарта.
-# Остальные параметры перечитываются командой /if reload.
-# Все значения по умолчанию соответствуют техническому заданию.
-# =============================================================================
-
+# Iron Frontiers — основные настройки.
+# Параметры database.*, multiserver.*, war_worlds и основные transform.* требуют рестарта.
 debug: false
 
-database:                         # [требует рестарта]
+database:
   host: 127.0.0.1
   port: 3306
   name: ironfrontiers
@@ -17,24 +12,19 @@ database:                         # [требует рестарта]
   pool_size: 6
   table_prefix: "if_"
 
-multiserver:                      # [требует рестарта]
-  enabled: false                  # При false Redis и его потоки не создаются.
-  server_id: server_1             # Уникальный ID сервера в кластере.
-  redis:
-    host: 127.0.0.1
-    port: 6379
-    password: ""
-    database: 0
+multiserver:
+  enabled: false
+  server_id: server_1
+  redis: {host: 127.0.0.1, port: 6379, password: "", database: 0}
   leader_lease_seconds: 10
   leader_heartbeat_seconds: 3
   cold_start_gap_seconds: 60
 
-war_worlds:                       # [требует рестарта]
-  - world_war
+war_worlds: [world_war]
 state_persist_interval_seconds: 10
 
 kpm:
-  update_interval_seconds: 1      # Диапазон 1..60.
+  update_interval_seconds: 1
   window_seconds: 60
   player_idle_cleanup_seconds: 120
 
@@ -65,18 +55,14 @@ spawn:
   despawn_spread_ticks: 8
   check_interval_ticks: 10
   despawn_check_interval_ticks: 20
-  formation:
-    spacing: 2.5
-    jitter: 0.3
-    random_rotation: true
-    ground_search_range: 6
+  formation: {spacing: 2.5, jitter: 0.3, random_rotation: true, ground_search_range: 6}
 
-transform:                        # Основные поля требуют рестарта.
+transform:
   biome_change_seconds: 15
   blocks_change_seconds: 60
-  direction: MIN_X_TO_MAX_X       # MIN_X_TO_MAX_X | MAX_X_TO_MIN_X | MIN_Z_TO_MAX_Z | MAX_Z_TO_MIN_Z
-  tick_budget_ms: 2.0             # Можно менять через /if reload.
-  min_tps: 18.0                   # Можно менять через /if reload.
+  direction: MIN_X_TO_MAX_X
+  tick_budget_ms: 2.0
+  min_tps: 18.0
   apply_on_chunk_load: true
   scan_threads: 2
 
@@ -88,11 +74,7 @@ stronghold:
   break_layer_delay_ticks: 5
   max_blocks_per_tick: 2000
   delete_animation: true
-  npc_parking:
-    world: world
-    x: 0.5
-    y: 200
-    z: 0.5
+  npc_parking: {world: world, x: 0.5, y: 200, z: 0.5}
 
 menus:
   update_interval_ticks: 10
@@ -117,6 +99,5 @@ placeholders:
   infinite_time_text: "∞"
   time_format: "mm:ss"
 
-# Публикация KillCountedEvent добавляется на этапе API и по умолчанию выключена.
 api:
   fire_kill_events: false

@@ -1,9 +1,9 @@
-# ПОДДЕРЖИВАЕМЫЕ ПЛЕЙСХОЛДЕРЫ МЕНЮ:
+# ПОДДЕРЖИВАЕМЫЕ ПЛЕЙСХОЛДЕРЫ:
 # {sector_id} {sector_name} {sector_state} {stronghold_state} {phase}
 # {requirements} {total_percent} {player_donated} {sector_donated} {time_left}
 # {perk_safe} {perk_destruction} {perk_held} {player_name}
-# Допускаются PlaceholderAPI placeholders и MiniMessage / legacy &-коды.
-# size: 9 или 27; interactive_slots — единственные слоты для перемещения предметов.
+# Допускаются PlaceholderAPI placeholders, MiniMessage и legacy &-коды.
+# size: 9 или 27; interactive_slots — только слоты с разрешённым перемещением предметов.
 bar:
   char: "⏽"
   segments: 20
