@@ -7,11 +7,12 @@
 - Добавлены обязательные отчётные файлы и полная копия docs/PLAN.txt.
 - Добавлен GitHub Actions CI для JDK 21 и Maven verify.
 - Добавлены API DTO/события, базовые интерфейсы сервисов, YAML-шаблоны, ConfigManager, сообщения, DB bootstrap, versioned migration и text editor sectors.yml.
-- Добавлены HikariCP, асинхронный JdbcStateStore, bounded write-behind и exponential retry при временной потере MySQL.
+- Добавлены HikariCP, асинхронный JdbcStateStore, bounded write-behind и последовательное сохранение обновлений сектора с exponential retry при временной потере MySQL.
 - Добавлены JUnit 5 тесты YamlTextEditor.
 
 ### Проверка
-- GitHub Actions run #4 для коммита 99397d2 завершился успешно: `mvn -B verify`, включая JUnit 5.
+- GitHub Actions run #5 для коммита ee303fa завершился успешно: `mvn -B verify`, включая JUnit 5.
+- Для main отдельно выполняется проверка Maven baseline.
 - Live-запуск на Purpur 1.20.6 и реальная MySQL-проверка не выполнены в этой среде.
 
 ### Известные ограничения

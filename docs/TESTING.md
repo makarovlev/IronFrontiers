@@ -3,7 +3,7 @@
 ## Этап 1 — основа проекта
 
 ### Автоматические тесты
-1. На JDK 21 выполнить `mvn -B verify`. Ожидание: reactor завершает API и plugin modules успешно, JUnit 5 тесты зелёные. Последняя подтверждённая проверка: GitHub Actions run #4 для commit 99397d2 — success.
+1. На JDK 21 выполнить `mvn -B verify`. Ожидание: reactor завершает API и plugin modules успешно, JUnit 5 тесты зелёные. Последняя подтверждённая проверка feature-ветки: GitHub Actions run #5 для commit ee303fa — success.
 2. YamlTextEditor: тесты проверяют сохранение комментариев при append, запрет дублирующего ID без учёта регистра, удаление одного блока и проверку ID.
 
 ### Ручные тесты на Purpur 1.20.6
