@@ -1,0 +1,122 @@
+# =============================================================================
+# Iron Frontiers — основные настройки
+# Изменения параметров, помеченных [требует рестарта], применяются после рестарта.
+# Остальные параметры перечитываются командой /if reload.
+# Все значения по умолчанию соответствуют техническому заданию.
+# =============================================================================
+
+debug: false
+
+database:                         # [требует рестарта]
+  host: 127.0.0.1
+  port: 3306
+  name: ironfrontiers
+  user: root
+  password: ""
+  use_ssl: false
+  pool_size: 6
+  table_prefix: "if_"
+
+multiserver:                      # [требует рестарта]
+  enabled: false                  # При false Redis и его потоки не создаются.
+  server_id: server_1             # Уникальный ID сервера в кластере.
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password: ""
+    database: 0
+  leader_lease_seconds: 10
+  leader_heartbeat_seconds: 3
+  cold_start_gap_seconds: 60
+
+war_worlds:                       # [требует рестарта]
+  - world_war
+state_persist_interval_seconds: 10
+
+kpm:
+  update_interval_seconds: 1      # Диапазон 1..60.
+  window_seconds: 60
+  player_idle_cleanup_seconds: 120
+
+sector_defaults:
+  kpm_capture: 45.0
+  kpm_held: 23.0
+  safe_time_seconds: 3600
+  destruction_time_seconds: 300
+  occupation_time_seconds: 300
+  startup_safe_seconds: 300
+  spawn_pause_after_capture_seconds: 180
+  destruction_cancel_hold_seconds: 10
+  destruction_resume_window_seconds: 120
+  freeze_when_empty: false
+
+messages:
+  batch_window_seconds: 3
+
+spawn:
+  trigger_distance: 15
+  despawn_distance: 200
+  min_spawn_distance: 8
+  first_kill_timer_seconds: 30
+  chain_delay_step_seconds: 30
+  chain_delay_max_seconds: 300
+  max_alive_clusters_per_sector: 3
+  max_alive_clusters_total: 6
+  despawn_spread_ticks: 8
+  check_interval_ticks: 10
+  despawn_check_interval_ticks: 20
+  formation:
+    spacing: 2.5
+    jitter: 0.3
+    random_rotation: true
+    ground_search_range: 6
+
+transform:                        # Основные поля требуют рестарта.
+  biome_change_seconds: 15
+  blocks_change_seconds: 60
+  direction: MIN_X_TO_MAX_X       # MIN_X_TO_MAX_X | MAX_X_TO_MIN_X | MIN_Z_TO_MAX_Z | MAX_Z_TO_MIN_Z
+  tick_budget_ms: 2.0             # Можно менять через /if reload.
+  min_tps: 18.0                   # Можно менять через /if reload.
+  apply_on_chunk_load: true
+  scan_threads: 2
+
+stronghold:
+  safe_time_multiplier: 2.0
+  destruction_time_multiplier: 5.0
+  kpm_held_multiplier: 0.9
+  build_layer_delay_ticks: 10
+  break_layer_delay_ticks: 5
+  max_blocks_per_tick: 2000
+  delete_animation: true
+  npc_parking:
+    world: world
+    x: 0.5
+    y: 200
+    z: 0.5
+
+menus:
+  update_interval_ticks: 10
+
+selection:
+  tool_material: STICK
+  show_duration_seconds: 15
+  particle_view_radius: 48
+  particle_step: 0.5
+  ribbon_height_offset: 0.1
+
+confirmations:
+  timeout_seconds: 30
+
+blueprint_export:
+  max_blocks: 50000
+
+placeholders:
+  outside_sector_name: "АА00"
+  kpm_decimals: 1
+  kpm_strip_trailing_zero: true
+  infinite_time_text: "∞"
+  time_format: "mm:ss"
+
+# Публикация KillCountedEvent добавляется на этапе API и по умолчанию выключена.
+api:
+  fire_kill_events: false

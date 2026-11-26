@@ -1,0 +1,28 @@
+name: IronFrontiers
+main: com.gachicraft.ironfrontiers.IronFrontiers
+version: ${project.version}
+api-version: '1.20'
+author: GachiCraft
+description: Захват территорий и развитие форпостов GachiCraft
+depend:
+  - PrivateMobsX
+softdepend:
+  - PlaceholderAPI
+  - MythicMobs
+  - MMOCore
+  - MMOItems
+  - ItemsAdder
+  - Citizens
+  - BetonQuest
+  - WorldEdit
+  - FastAsyncWorldEdit
+commands:
+  if:
+    description: Управление Iron Frontiers
+    usage: /if
+    aliases: [ironfrontier, ironfrontiers]
+    permission: ironfrontiers.admin
+permissions:
+  ironfrontiers.admin:
+    description: Доступ ко всем административным командам Iron Frontiers
+    default: op

@@ -1,0 +1,73 @@
+# =============================================================================
+# Все сообщения игрокам и администраторам находятся в этом файле.
+# Поддерживается MiniMessage; старые цветовые коды &a, &c и т.п. совместимы.
+# Плейсхолдеры записываются в фигурных скобках: {sector}, {seconds} и т.д.
+# =============================================================================
+general:
+  prefix: "<dark_gray>[<gold>IronFrontiers</gold>]</dark_gray> "
+  no_permission: "<red>У вас недостаточно прав."
+  player_only: "<red>Эту команду может выполнить только игрок."
+  unknown_subcommand: "<red>Неизвестная подкоманда. Используйте <yellow>/if</yellow>."
+  reload_done: "<green>Конфигурации перезагружены."
+  reload_restart_required: "<yellow>Параметр <white>{param}</white> изменён в файле, но требует перезапуска сервера."
+  db_unavailable: "<red>База данных недоступна. Игровые механики временно отключены."
+  multiserver_forbidden: "<red>Эта операция запрещена в многосерверном режиме."
+  usage:
+    root: "<yellow>Использование: /if reload"
+sector:
+  not_found: "<red>Сектор <white>{sector}</white> не найден."
+  name_invalid: "<red>Имя сектора может содержать только латинские буквы, цифры, _ и -."
+  name_exists: "<red>Сектор с таким именем уже существует."
+selection:
+  tool_name: "<gold>Инструмент выделения сектора"
+  tool_given: "<green>Инструмент выделения выдан."
+  session_lost: "<red>Сессия выделения потеряна."
+  no_session: "<red>У вас нет активной сессии выделения."
+  point_added: "<green>Вершина {n}: X={x}, Z={z}."
+  point_removed: "<yellow>Последняя вершина удалена."
+  err_world: "<red>Нельзя выделять сектор в другом мире."
+  err_axis: "<red>Следующая вершина должна лежать на X={px} или Z={pz}."
+  err_close_axis: "<red>Последняя точка должна иметь X={x0} или Z={z0}."
+  err_overlap_edge: "<red>Новое ребро пересекает или касается несмежного ребра."
+  err_reverse: "<red>Ребро разворачивается на 180 градусов."
+  err_intersects_sector: "<red>Территория пересекается с сектором {sector}."
+  err_border: "<red>Точка находится за пределами WorldBorder."
+  created: "<green>Сектор {sector} создан. Площадь: {area} клеток."
+confirm:
+  none_pending: "<red>Нет ожидающей команды для подтверждения."
+  expired: "<red>Время подтверждения истекло."
+  accepted: "<green>Команда подтверждена."
+game:
+  captured: "<green>Сектор {sector} захвачен!"
+  destruction_started_single: "<red>Контроль над сектором {sector} под угрозой. Осталось {time}."
+  destruction_started_multi: "<red>Контроль над секторами {sectors} под угрозой. Осталось {time}."
+  destruction_cancelled: "<green>Контроль над сектором {sector} восстановлен."
+  lost_single: "<red>Сектор {sector} потерян."
+  lost_multi: "<red>Потеряны сектора {sectors}."
+  startup_grace: "<yellow>Активен период безопасного запуска."
+stronghold:
+  not_available: "<red>В этом секторе нет форпоста."
+  blocked_state: "<red>Действие недоступно в текущем состоянии сектора."
+  build_started: "<green>Строительство форпоста началось."
+  build_done: "<green>Форпост построен."
+  repair_started: "<green>Ремонт форпоста начался."
+  repair_done: "<green>Форпост отремонтирован."
+  broken: "<red>Форпост разрушен."
+  deleted: "<yellow>Форпост удалён."
+  admin_build: "<green>Принудительное строительство запущено."
+  admin_repair: "<green>Принудительный ремонт запущен."
+  admin_delete: "<yellow>Форпост удалён администратором."
+menu:
+  open_error_state: "<red>Меню недоступно в текущем состоянии сектора."
+  open_error_nostronghold: "<red>Для этого сектора не настроен форпост."
+  donate_blocked: "<red>Сейчас пожертвования недоступны."
+  donate_done: "<green>Принято предметов: {amount}."
+  donate_returned: "<yellow>Излишек возвращён в инвентарь."
+  closed: "<gray>Меню закрыто."
+blueprint:
+  export_done: "<green>Чертёж {name} экспортирован: {count} блоков, пропущено {skipped}."
+  err_selection: "<red>Сначала выделите область WorldEdit."
+  err_target: "<red>Некорректная цель экспорта."
+  err_too_big: "<red>Чертёж превышает допустимое число блоков."
+  err_worldedit: "<red>WorldEdit/FAWE не найден."
+# Дополнительные ключи будут добавляться в рамках соответствующих этапов.
