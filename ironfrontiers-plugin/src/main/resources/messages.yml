@@ -13,11 +13,11 @@ general:
   usage:
     root: "<yellow>Использование: /if reload"
     reload: "<yellow>Использование: /if reload"
-    sectors: "<yellow>Использование: /if sectors <create|list|info|tp|show|delete|set|rescan>"
+    sectors: "<yellow>Использование: /if sectors create|list|info|tp|show|delete|set|rescan"
     mobs: "<yellow>Использование: /if mobs"
-    stronghold: "<yellow>Использование: /if stronghold <build|repair|delete>"
-    menu: "<yellow>Использование: /if menu <open|close>"
-    blueprint: "<yellow>Использование: /if blueprint <export|export_broken>"
+    stronghold: "<yellow>Использование: /if stronghold build|repair|delete"
+    menu: "<yellow>Использование: /if menu open|close"
+    blueprint: "<yellow>Использование: /if blueprint export|export_broken"
 sector:
   not_found: "<red>Сектор {sector} не найден."
   name_invalid: "<red>Имя сектора может содержать только латинские буквы, цифры, _ и -."
@@ -95,7 +95,6 @@ blueprint:
   err_target: "<red>Некорректная цель экспорта."
   err_too_big: "<red>Чертёж превышает допустимое число блоков."
   err_worldedit: "<red>WorldEdit/FAWE не найден."
-# Предупреждения валидаторов конфигурации выводятся в консоль с путём к ключу.
 config:
   warn:
     invalid_type: "Неверный тип значения"

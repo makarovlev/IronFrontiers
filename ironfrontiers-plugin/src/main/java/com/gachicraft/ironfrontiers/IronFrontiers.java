@@ -12,10 +12,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.concurrent.CompletionException;
 
-/**
- * Iron Frontiers plugin entry point. Bootstrap owns lifecycle and dependency wiring;
- * gameplay services are introduced by their corresponding implementation stages.
- */
+/** Plugin lifecycle and manual dependency bootstrap. */
 public final class IronFrontiers extends JavaPlugin {
     private final ServiceRegistry services = new ServiceRegistry();
     private ConfigManager configs;
@@ -35,10 +32,10 @@ public final class IronFrontiers extends JavaPlugin {
             configs.loadInitial();
             services.register(ConfigManager.class, configs);
 
-            int dbThreads = configs.config().getInt("database.pool_size", 6);
-            int ioThreads = configs.config().getInt("transform.scan_threads", 2);
-            boolean multiserver = configs.config().getBoolean("multiserver.enabled", false);
-            executors = new ExecutorPools(dbThreads, ioThreads, multiserver);
+            executors = new ExecutorPools(
+                    configs.config().getInt("database.pool_size", 6),
+                    configs.config().getInt("transform.scan_threads", 2),
+                    configs.config().getBoolean("multiserver.enabled", false));
             services.register(ExecutorPools.class, executors);
 
             timers = new CentralTimerScheduler(this);
@@ -100,8 +97,9 @@ public final class IronFrontiers extends JavaPlugin {
                             scheduleDatabaseRetry();
                             return;
                         }
-                        database = handle;
-                        services.register(StateStore.class, handle.stateStore());
+                        StateStore reliableStore = new RetryingStateStore(this, handle.stateStore(), timers);
+                        database = new DatabaseHandle(handle.dataSource(), reliableStore);
+                        services.register(StateStore.class, reliableStore);
                         databaseReady = true;
                         nextDatabaseRetrySeconds = 5;
                         getLogger().info("MySQL connected; loaded " + states.size() + " persisted sector state(s)");
@@ -113,15 +111,13 @@ public final class IronFrontiers extends JavaPlugin {
 
     private void reportDatabaseFailure(Throwable error) {
         Throwable cause = error;
-        while ((cause instanceof CompletionException || cause.getCause() != null) && cause.getCause() != null) {
-            cause = cause.getCause();
-        }
+        while (cause.getCause() != null) cause = cause.getCause();
         long now = System.nanoTime();
         if (initialDatabaseAttempt || now - lastDatabaseWarningNanos >= 60_000_000_000L) {
             if (initialDatabaseAttempt) {
                 getLogger().severe("MySQL is unavailable; sector mechanics will not start: " + cause.getMessage());
             } else {
-                getLogger().warning("MySQL is still unavailable; queued persistence will be retried: " + cause.getMessage());
+                getLogger().warning("MySQL is still unavailable; database bootstrap will be retried: " + cause.getMessage());
             }
             lastDatabaseWarningNanos = now;
         }

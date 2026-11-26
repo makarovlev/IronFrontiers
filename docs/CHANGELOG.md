@@ -4,12 +4,16 @@
 
 ### Добавлено
 - Инициализирован Maven multi-module проект: parent, API и plugin.
-- Добавлены обязательные файлы документации и полная копия docs/PLAN.txt.
-- Добавлен CI workflow с JDK 21 и Maven verify.
-- Добавлены публичные API DTO/события, базовые интерфейсы сервисов, YAML-шаблоны, ConfigManager, сообщения, DB bootstrap и текстовый редактор sectors.yml.
-- Добавлен JUnit 5 набор для YamlTextEditor.
+- Добавлены обязательные отчётные файлы и полная копия docs/PLAN.txt.
+- Добавлен GitHub Actions CI для JDK 21 и Maven verify.
+- Добавлены API DTO/события, базовые интерфейсы сервисов, YAML-шаблоны, ConfigManager, сообщения, DB bootstrap, versioned migration и text editor sectors.yml.
+- Добавлены HikariCP, асинхронный JdbcStateStore, bounded write-behind и exponential retry при временной потере MySQL.
+- Добавлены JUnit 5 тесты YamlTextEditor.
+
+### Проверка
+- GitHub Actions run #4 для коммита 99397d2 завершился успешно: `mvn -B verify`, включая JUnit 5.
+- Live-запуск на Purpur 1.20.6 и реальная MySQL-проверка не выполнены в этой среде.
 
 ### Известные ограничения
-- Сборка и тесты требуют проверки в окружении с JDK 21 и доступом к Maven Central/PaperMC repository.
-- Реальная проверка Purpur/MySQL не проводилась в этом окружении.
-- Интеграция PrivateMobsX ожидает согласования публичного SPI (см. docs/QUESTIONS.md).
+- Runtime-интеграция PrivateMobsX ожидает согласования API из раздела 18.1.
+- Лицензия репозитория ожидает решения владельца.

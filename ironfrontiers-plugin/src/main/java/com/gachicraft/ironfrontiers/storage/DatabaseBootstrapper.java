@@ -1,19 +1,17 @@
 package com.gachicraft.ironfrontiers.storage;
 
+import com.gachicraft.ironfrontiers.storage.migration.Migration_1;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-/** Opens MySQL and applies the initial schema migration exclusively on the DB executor. */
+/** Opens MySQL and applies versioned migrations exclusively on the DB executor. */
 public final class DatabaseBootstrapper {
-    private static final int SCHEMA_VERSION = 1;
     private final Plugin plugin;
     private final Executor databaseExecutor;
 
@@ -44,7 +42,9 @@ public final class DatabaseBootstrapper {
                 hikari.setValidationTimeout(3000L);
                 hikari.setPoolName("IronFrontiers-MySQL");
                 pool = new HikariDataSource(hikari);
-                migrate(pool, prefix);
+
+                int schemaVersion = new SchemaMigrator(List.of(new Migration_1())).migrate(pool, prefix);
+                plugin.getLogger().info("Database schema version " + schemaVersion + " is ready");
                 JdbcStateStore store = new JdbcStateStore(pool, databaseExecutor, prefix);
                 return new DatabaseHandle(pool, store);
             } catch (Exception exception) {
@@ -52,30 +52,5 @@ public final class DatabaseBootstrapper {
                 throw new IllegalStateException("MySQL initialization failed", exception);
             }
         }, databaseExecutor);
-    }
-
-    private void migrate(HikariDataSource pool, String prefix) throws Exception {
-        String schemaTable = prefix + "schema";
-        String stateTable = prefix + "sector_state";
-        try (Connection connection = pool.getConnection(); Statement statement = connection.createStatement()) {
-            statement.executeUpdate("CREATE TABLE IF NOT EXISTS " + schemaTable
-                    + " (version INT NOT NULL)");
-            try (ResultSet result = statement.executeQuery("SELECT version FROM " + schemaTable + " LIMIT 1")) {
-                if (!result.next()) statement.executeUpdate("INSERT INTO " + schemaTable + " (version) VALUES (0)");
-            }
-            statement.executeUpdate("CREATE TABLE IF NOT EXISTS " + stateTable + " ("
-                    + "sector_id VARCHAR(64) NOT NULL PRIMARY KEY,"
-                    + "state VARCHAR(16) NOT NULL,"
-                    + "state_left_s INT NULL,"
-                    + "occupation_left_s INT NOT NULL DEFAULT 0,"
-                    + "destruction_saved_s INT NULL,"
-                    + "resume_window_left_s INT NOT NULL DEFAULT 0,"
-                    + "version BIGINT NOT NULL DEFAULT 0,"
-                    + "leader_epoch BIGINT NOT NULL DEFAULT 0,"
-                    + "updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-                    + ") CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-            statement.executeUpdate("UPDATE " + schemaTable + " SET version = " + SCHEMA_VERSION);
-        }
-        plugin.getLogger().info("Database schema version " + SCHEMA_VERSION + " is ready");
     }
 }
