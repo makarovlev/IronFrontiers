@@ -19,18 +19,23 @@ public final class Messages {
     public Messages(YamlConfiguration source) { this.source = Objects.requireNonNull(source); }
 
     public Component component(String key, Map<String, String> placeholders) {
-        String text = source.getString(key);
-        if (text == null) text = "<red>Missing message: " + key;
+        String text = source.getString(key, "");
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
             text = text.replace("{" + entry.getKey() + "}", entry.getValue());
         }
+        Component rendered = miniMessage.deserialize(convertLegacyCodes(text));
+        if ("general.prefix".equals(key) || text.isEmpty()) return rendered;
+        String prefix = source.getString("general.prefix", "");
+        return miniMessage.deserialize(convertLegacyCodes(prefix)).append(rendered);
+    }
+
+    private String convertLegacyCodes(String text) {
         Matcher matcher = LEGACY.matcher(text);
         StringBuffer converted = new StringBuffer();
-        while (matcher.find()) {
-            matcher.appendReplacement(converted, Matcher.quoteReplacement(legacyTag(matcher.group(1).charAt(0))));
-        }
+        while (matcher.find()) matcher.appendReplacement(converted,
+                Matcher.quoteReplacement(legacyTag(matcher.group(1).charAt(0))));
         matcher.appendTail(converted);
-        return miniMessage.deserialize(converted.toString());
+        return converted.toString();
     }
 
     private String legacyTag(char code) {

@@ -1,12 +1,12 @@
-package com.gachicraft.ironfrontiers.selection;
+package com.gachicraft.ironfrontiers.util;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * Text-preserving editor for top-level entries in sectors.yml. It intentionally
- * avoids parse/save cycles so administrator comments and formatting survive.
+ * Text-preserving editor for top-level entries in sectors.yml. It avoids a YAML
+ * parse/save cycle so comments and formatting written by the administrator survive.
  */
 public final class YamlTextEditor {
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9_-]+");
@@ -20,9 +20,7 @@ public final class YamlTextEditor {
         int end = findSectionEnd(lines, root);
         for (int i = root + 1; i < end; i++) {
             String key = childKey(lines[i]);
-            if (key != null && key.equalsIgnoreCase(sectorId)) {
-                throw new IllegalArgumentException("Sector already exists: " + sectorId);
-            }
+            if (key != null && key.equalsIgnoreCase(sectorId)) throw new IllegalArgumentException("Sector already exists: " + sectorId);
         }
         List<String> result = new ArrayList<>(List.of(lines));
         int insertion = end;
@@ -48,7 +46,6 @@ public final class YamlTextEditor {
         if (start < 0) throw new IllegalArgumentException("Sector does not exist: " + sectorId);
         int blockEnd = start + 1;
         while (blockEnd < end) {
-            // A sibling-level comment may be a note for the next sector; preserve it.
             if (lines[blockEnd].startsWith("  #") || childKey(lines[blockEnd]) != null) break;
             blockEnd++;
         }
@@ -63,12 +60,10 @@ public final class YamlTextEditor {
         int colon = trimmed.indexOf(':');
         return colon <= 0 ? null : trimmed.substring(0, colon).trim();
     }
-
     private static int findRoot(String[] lines, String rootKey) {
         for (int i = 0; i < lines.length; i++) if (lines[i].equals(rootKey + ":")) return i;
         throw new IllegalArgumentException("Missing top-level YAML section: " + rootKey);
     }
-
     private static int findSectionEnd(String[] lines, int root) {
         for (int i = root + 1; i < lines.length; i++) {
             String line = lines[i];
@@ -76,7 +71,6 @@ public final class YamlTextEditor {
         }
         return lines.length;
     }
-
     private static void validateId(String id) {
         if (id == null || !ID.matcher(id).matches()) throw new IllegalArgumentException("Invalid sector id: " + id);
     }

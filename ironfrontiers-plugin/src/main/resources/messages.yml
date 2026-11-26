@@ -1,6 +1,6 @@
-# Все сообщения игрокам/администраторам хранятся здесь.
-# Формат MiniMessage; legacy-коды &a, &c и подобные также поддерживаются.
-# Плейсхолдеры задаются в фигурных скобках: {sector}, {param}, {seconds}.
+# Все сообщения игрокам и администраторам находятся здесь.
+# Формат: MiniMessage; старые цветовые коды &a, &c и т.п. также поддерживаются.
+# Плейсхолдеры задаются в фигурных скобках: {sector}, {seconds}, {param}.
 general:
   prefix: "<dark_gray>[<gold>IronFrontiers</gold>]</dark_gray> "
   no_permission: "<red>У вас недостаточно прав."
@@ -12,10 +12,37 @@ general:
   multiserver_forbidden: "<red>Эта операция запрещена в многосерверном режиме."
   usage:
     root: "<yellow>Использование: /if reload"
+    reload: "<yellow>Использование: /if reload"
+    sectors: "<yellow>Использование: /if sectors <create|list|info|tp|show|delete|set|rescan>"
+    mobs: "<yellow>Использование: /if mobs"
+    stronghold: "<yellow>Использование: /if stronghold <build|repair|delete>"
+    menu: "<yellow>Использование: /if menu <open|close>"
+    blueprint: "<yellow>Использование: /if blueprint <export|export_broken>"
 sector:
   not_found: "<red>Сектор {sector} не найден."
   name_invalid: "<red>Имя сектора может содержать только латинские буквы, цифры, _ и -."
   name_exists: "<red>Сектор с таким именем уже существует."
+  list_header: "<gold>Список секторов:"
+  line: "<gray>• <white>{sector}</white> — {state} <dark_gray>(KPM: {kpm})"
+  info:
+    header: "<gold>Информация о секторе {sector}"
+    world: "<gray>Мир: <white>{world}"
+    state: "<gray>Состояние: <white>{state}"
+    kpm: "<gray>KPM: <white>{kpm}"
+    capture: "<gray>Порог захвата: <white>{kpm_capture}"
+    held: "<gray>Порог удержания: <white>{kpm_held}"
+    time: "<gray>Осталось времени: <white>{time}"
+    area: "<gray>Площадь: <white>{area}"
+    stronghold: "<gray>Форпост: <white>{stronghold}"
+  tp_done: "<green>Вы перемещены к сектору {sector}."
+  delete_prompt: "<yellow>Удалить сектор {sector} через {seconds} сек.? Выполните /if agree."
+  delete_done: "<green>Сектор {sector} удалён."
+  set_done: "<green>Для сектора {sector} параметр {what} установлен в {value}."
+  set_invalid: "<red>Недопустимое значение параметра."
+  show_started: "<green>Предпросмотр сектора включён на {seconds} сек."
+  rescan_started: "<yellow>Пересканирование сектора запущено."
+  rescan_done: "<green>Пересканирование сектора завершено."
+  rescan_forbidden: "<red>Пересканирование запрещено в многосерверном режиме."
 selection:
   tool_name: "<gold>Инструмент выделения сектора"
   tool_given: "<green>Инструмент выделения выдан."
@@ -68,3 +95,10 @@ blueprint:
   err_target: "<red>Некорректная цель экспорта."
   err_too_big: "<red>Чертёж превышает допустимое число блоков."
   err_worldedit: "<red>WorldEdit/FAWE не найден."
+# Предупреждения валидаторов конфигурации выводятся в консоль с путём к ключу.
+config:
+  warn:
+    invalid_type: "Неверный тип значения"
+    invalid_range: "Значение вне допустимого диапазона"
+    invalid_id: "Неверный идентификатор"
+    disabled_entry: "Элемент отключён из-за ошибок конфигурации"
