@@ -118,8 +118,9 @@ public final class ConfigManager {
                 continue;
             }
             if (!yaml.isString(path)) {
-                warnings.add("messages." + path + ": expected string; the invalid message is disabled");
-                yaml.set(path, "");
+                warnings.add("messages." + path + ": expected string; embedded default restored");
+                Object defaultValue = yaml.getDefaults() == null ? null : yaml.getDefaults().get(path);
+                yaml.set(path, defaultValue instanceof String ? defaultValue : "");
             }
         }
 
