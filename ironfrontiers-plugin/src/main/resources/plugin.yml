@@ -21,7 +21,6 @@ commands:
     description: Управление Iron Frontiers
     usage: /if
     aliases: [ironfrontier, ironfrontiers]
-    permission: ironfrontiers.admin
 permissions:
   ironfrontiers.admin:
     description: Доступ ко всем административным командам Iron Frontiers

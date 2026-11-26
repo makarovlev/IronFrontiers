@@ -24,6 +24,10 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
             messages.send(sender, "general.no_permission");
             return true;
         }
+        if (args.length == 0) {
+            messages.send(sender, "general.usage.root");
+            return true;
+        }
         if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
             ReloadReport report = configs.reload();
             Messages updated = new Messages(configs.messages());
