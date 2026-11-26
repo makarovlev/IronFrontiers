@@ -5,15 +5,15 @@
 | Возможность | Статус | Как проверить |
 |---|---|---|
 | Инициализация Git, README, полный docs/PLAN.txt и отчётные файлы | готово | Проверить наличие файлов; docs/PLAN.txt — точная копия исходного ТЗ |
-| Maven baseline в main | проверка CI выполняется | В main добавлены reactor POM, два модуля, JDK 21 Enforcer и GitHub Actions |
-| Maven multi-module: parent + API + plugin | проверено CI | GitHub Actions run #5: `mvn -B verify` на JDK 21 |
-| Java 21 Enforcer и GitHub Actions CI | проверено | Run #5 для коммита ee303fa завершился success |
+| Maven baseline в main | проверено CI | Main run #7: `mvn -B verify` завершился success |
+| Maven multi-module: parent + API + plugin | проверено CI | Feature run #8: `mvn -B verify` на JDK 21 |
+| Java 21 Enforcer и GitHub Actions CI | проверено | Feature run #8 завершился success |
 | Публичные DTO и события API | проверено CI | API-модуль компилируется; consumer-плагин будет проверен на этапе 4 |
 | plugin.yml, /if reload, TAB skeleton | готово (каркас) | Запустить Purpur 1.20.6 с PrivateMobsX; проверить aliases, permission и /if reload |
 | Шесть YAML-файлов с русскими комментариями | готово (шаблоны) | Первый запуск создаёт config.yml, messages.yml, sectors.yml, mobs.yml, blueprints.yml, menus.yml |
 | ConfigManager, валидаторы, restart-required reload | готово (исходный код) | Изменить database.host и transform.tick_budget_ms; /if reload удерживает первое значение и применяет второе |
 | Messages: MiniMessage + legacy &-коды и prefix | готово (исходный код) | Проверить сообщение в обоих форматах на сервере |
-| YamlTextEditor и JUnit 5 тесты | проверено CI | Run #5: тесты YamlTextEditor прошли в составе `mvn -B verify` |
+| YamlTextEditor и JUnit 5 тесты | проверено CI | Feature run #8: тесты YamlTextEditor прошли в составе `mvn -B verify` |
 | Центральный планировщик и именованные пулы | готово (исходный код) | Проверить одну Bukkit-задачу, freeze/resume; Redis executor отсутствует при multiserver.enabled=false |
 | MySQL Hikari, if_schema, if_sector_state, StateStore | готово (исходный код; live DB не проверена) | Подключить тестовую MySQL; ожидается применение миграции и загрузка строк |
 | Runtime DB outage: bounded write-behind и exponential retry | готово (исходный код; live outage не проверен) | Остановить MySQL после запуска; проверить очередь, восстановление и WARNING не чаще раза в минуту |

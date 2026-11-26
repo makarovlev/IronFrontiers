@@ -11,8 +11,8 @@
 - Добавлены JUnit 5 тесты YamlTextEditor.
 
 ### Проверка
-- GitHub Actions run #5 для коммита ee303fa завершился успешно: `mvn -B verify`, включая JUnit 5.
-- Для main отдельно выполняется проверка Maven baseline.
+- GitHub Actions feature run #8 для коммита 39b956b завершился успешно: `mvn -B verify`, включая JUnit 5.
+- GitHub Actions main run #7 для коммита a2e86ca завершился успешно: Maven baseline собирается.
 - Live-запуск на Purpur 1.20.6 и реальная MySQL-проверка не выполнены в этой среде.
 
 ### Известные ограничения
