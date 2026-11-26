@@ -29,7 +29,9 @@
               <relocation><pattern>com.mysql.cj</pattern><shadedPattern>com.gachicraft.ironfrontiers.libs.mysql</shadedPattern></relocation>
               <relocation><pattern>redis.clients.jedis</pattern><shadedPattern>com.gachicraft.ironfrontiers.libs.jedis</shadedPattern></relocation>
             </relocations>
-            <filters><filter><artifact>*:*</artifact><excludes><exclude>META-INF/*.SF</exclude><exclude>META-INF/*.DSA</exclude><exclude>META-INF/*.RSA</exclude></excludes></filter></filters>
+            <filters><filter><artifact>*:*</artifact><excludes>
+              <exclude>META-INF/*.SF</exclude><exclude>META-INF/*.DSA</exclude><exclude>META-INF/*.RSA</exclude>
+            </excludes></filter></filters>
             <transformers><transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/></transformers>
           </configuration>
         </execution></executions>
