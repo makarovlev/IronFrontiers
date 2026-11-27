@@ -57,12 +57,12 @@ class SectorStateMachineTest {
 
     @Test
     void destructionNeedsConsecutiveHeldTimeToCancel() {
-        SectorRuntimeState destruction = new SectorRuntimeState(SectorState.DESTRUCTION, 4L, 0,
+        SectorRuntimeState destruction = new SectorRuntimeState(SectorState.DESTRUCTION, 10L, 0,
                 null, 0, 0, 0, 7, false);
         var first = SectorStateMachine.tick(destruction, policy(false, false), 230, 1, false, 1);
         assertEquals(SectorState.DESTRUCTION, first.state().state());
         assertEquals(1L, first.state().heldOkSeconds());
-        assertEquals(3L, first.state().stateLeftSeconds());
+        assertEquals(9L, first.state().stateLeftSeconds());
 
         var dip = SectorStateMachine.tick(first.state(), policy(false, false), 229, 1, false, 1);
         assertEquals(0L, dip.state().heldOkSeconds());
@@ -72,7 +72,7 @@ class SectorStateMachineTest {
         var regain3 = SectorStateMachine.tick(regain2.state(), policy(false, false), 230, 1, false, 1);
         assertEquals(SectorState.HELD, regain3.state().state());
         assertEquals(SectorTransition.Kind.DESTRUCTION_CANCELLED, regain3.transition().kind());
-        assertEquals(3L, regain3.state().destructionSavedSeconds());
+        assertEquals(6L, regain3.state().destructionSavedSeconds());
         assertEquals(10L, regain3.state().resumeWindowLeftSeconds());
     }
 

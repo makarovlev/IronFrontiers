@@ -29,7 +29,9 @@ class KpmWindowTest {
         KpmWindow window = new KpmWindow(60);
         window.add(40, 100);
         window.add(10, 101);
-        assertEquals(50L, window.sumTenths(161));
+        // At second 161 the 60-second window contains 102..161; both
+        // earlier buckets have expired and the skipped interval clears the ring.
+        assertEquals(0L, window.sumTenths(161));
     }
 
     @Test
