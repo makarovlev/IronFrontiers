@@ -93,11 +93,12 @@ public final class RasterizedSector {
     private static List<IntRect> buildRectangles(NavigableMap<Integer, List<IntInterval>> rows) {
         Map<IntInterval, Integer> active = new HashMap<>();
         List<IntRect> result = new ArrayList<>();
-        int previousZ = Integer.MIN_VALUE;
+        int previousZ = 0;
+        boolean hasPreviousRow = false;
 
         for (Map.Entry<Integer, List<IntInterval>> row : rows.entrySet()) {
             int z = row.getKey();
-            if (previousZ != Integer.MIN_VALUE && (long) z != (long) previousZ + 1L) {
+            if (hasPreviousRow && (long) z != (long) previousZ + 1L) {
                 finishActive(active, result, previousZ);
             }
 
@@ -116,6 +117,7 @@ public final class RasterizedSector {
                 active.putIfAbsent(interval, z);
             }
             previousZ = z;
+            hasPreviousRow = true;
         }
 
         finishActive(active, result, previousZ);

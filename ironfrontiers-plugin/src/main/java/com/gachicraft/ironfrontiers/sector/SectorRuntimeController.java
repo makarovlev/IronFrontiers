@@ -255,6 +255,9 @@ public final class SectorRuntimeController implements AutoCloseable {
             case SAFE_ENDED_TO_HELD -> server.getPluginManager().callEvent(
                     new SectorSafeEndedEvent(createView(definition, next)));
             case DESTRUCTION_STARTED -> {
+                if (previous.state() == SectorState.SAFE) {
+                    server.getPluginManager().callEvent(new SectorSafeEndedEvent(createView(definition, next)));
+                }
                 server.getPluginManager().callEvent(new SectorDestructionStartedEvent(createView(definition, next)));
                 messageBatcher.destructionStarted(definition, next.stateLeftSeconds());
             }

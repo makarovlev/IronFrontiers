@@ -48,4 +48,15 @@ class SectorGeometryIndexTest {
         assertArrayEquals(new int[0], index.sectorsNear(world, 20, 1, 11));
         assertEquals(12.0, index.distanceToSector(0, 20, 1), 0.0001);
     }
+
+    @Test
+    void veryLargeRadiusDoesNotOverflowCoordinateBounds() {
+        UUID world = UUID.randomUUID();
+        SectorGeometryIndex.Builder builder = new SectorGeometryIndex.Builder();
+        builder.add(world, AxisAlignedPolygon.rasterize(List.of(new GridPoint(100, 100))));
+        SectorGeometryIndex index = builder.build();
+
+        assertArrayEquals(new int[]{0},
+                index.sectorsNear(world, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE));
+    }
 }

@@ -50,18 +50,31 @@ public final class SectorGeometryIndex {
             return new int[0];
         }
 
-        int minChunkX = (x - radius) >> 4;
-        int maxChunkX = (x + radius) >> 4;
-        int minChunkZ = (z - radius) >> 4;
-        int maxChunkZ = (z + radius) >> 4;
+        long minBlockX = Math.max(Integer.MIN_VALUE, (long) x - radius);
+        long maxBlockX = Math.min(Integer.MAX_VALUE, (long) x + radius);
+        long minBlockZ = Math.max(Integer.MIN_VALUE, (long) z - radius);
+        long maxBlockZ = Math.min(Integer.MAX_VALUE, (long) z + radius);
+        int minChunkX = (int) Math.floorDiv(minBlockX, 16L);
+        int maxChunkX = (int) Math.floorDiv(maxBlockX, 16L);
+        int minChunkZ = (int) Math.floorDiv(minBlockZ, 16L);
+        int maxChunkZ = (int) Math.floorDiv(maxBlockZ, 16L);
         BitSet candidates = new BitSet(entries.size());
 
-        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
-            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
-                List<Coverage> coverages = world.chunks.get(chunkKey(chunkX, chunkZ));
-                if (coverages != null) {
-                    for (Coverage coverage : coverages) {
-                        candidates.set(coverage.sectorIndex);
+        long chunksX = (long) maxChunkX - minChunkX + 1L;
+        long chunksZ = (long) maxChunkZ - minChunkZ + 1L;
+        if (chunksX * chunksZ > Math.max(4096L, (long) entries.size() * 4L)) {
+            // Very large radius: avoid walking millions of empty chunk keys.
+            for (int i = 0; i < entries.size(); i++) {
+                if (entries.get(i).worldId.equals(worldId)) candidates.set(i);
+            }
+        } else {
+            for (long chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                for (long chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                    List<Coverage> coverages = world.chunks.get(chunkKey((int) chunkX, (int) chunkZ));
+                    if (coverages != null) {
+                        for (Coverage coverage : coverages) {
+                            candidates.set(coverage.sectorIndex);
+                        }
                     }
                 }
             }
