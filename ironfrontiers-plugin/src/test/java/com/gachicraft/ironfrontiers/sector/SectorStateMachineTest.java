@@ -43,6 +43,7 @@ class SectorStateMachineTest {
         var result = SectorStateMachine.tick(safe, policy(false, false), 230, 1, false, 1);
         assertEquals(SectorState.HELD, result.state().state());
         assertEquals(SectorTransition.Kind.SAFE_ENDED_TO_HELD, result.transition().kind());
+        assertEquals(3L, result.state().version());
     }
 
     @Test

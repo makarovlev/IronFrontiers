@@ -103,7 +103,7 @@ config:
     disabled_entry: "Элемент отключён из-за ошибок конфигурации"
 
 debug:
-  disabled: "<red>Откладочная система выключена (debug: false)."
+  disabled: "<red>Отладочная система выключена (debug: false)."
   usage_kill: "<yellow>Использование: /if debug kill <sector> <n> [weight]"
   usage_state: "<yellow>Использование: /if debug state <sector> <state>"
   invalid_count: "<red>Количество убийств должно быть от 1 до 10000."

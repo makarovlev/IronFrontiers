@@ -57,7 +57,7 @@ public final class SectorStateMachine {
                             next = changeState(next, SectorState.HELD, null,
                                     next.occupationLeftSeconds(), next.destructionSavedSeconds(),
                                     next.resumeWindowLeftSeconds(), next.spawnPauseLeftSeconds(),
-                                    0, next.version());
+                                    0, next.version() + 1);
                             transition = SectorTransition.Kind.SAFE_ENDED_TO_HELD;
                         } else {
                             next = startDestruction(next, policy);

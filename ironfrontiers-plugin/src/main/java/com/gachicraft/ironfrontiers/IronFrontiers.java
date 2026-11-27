@@ -14,6 +14,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /** Plugin lifecycle and explicit dependency bootstrap. */
 public final class IronFrontiers extends JavaPlugin {
@@ -186,19 +188,32 @@ public final class IronFrontiers extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        CompletableFuture<Void> finalFlush = null;
         if (sectorController != null) {
             sectorController.close();
-            // The bounded DB executor remains alive until queued state snapshots flush.
-            sectorController.persistAll();
+            // Keep the database pool and executor alive until the final state snapshots finish.
+            finalFlush = sectorController.persistAll();
         }
+
+        if (finalFlush != null) {
+            try {
+                finalFlush.get(10, TimeUnit.SECONDS);
+            } catch (TimeoutException exception) {
+                getLogger().severe("Timed out while flushing sector states during shutdown; some latest states may not have reached MySQL.");
+            } catch (Exception exception) {
+                getLogger().log(java.util.logging.Level.SEVERE,
+                        "Could not flush all sector states during shutdown", exception);
+            }
+        }
+
         if (timers != null) timers.close();
-        if (executors != null) {
-            executors.close();
-            executors = null;
-        }
         if (database != null) {
             database.close();
             database = null;
+        }
+        if (executors != null) {
+            executors.close();
+            executors = null;
         }
         services.clear();
         getLogger().info("Iron Frontiers disabled");
