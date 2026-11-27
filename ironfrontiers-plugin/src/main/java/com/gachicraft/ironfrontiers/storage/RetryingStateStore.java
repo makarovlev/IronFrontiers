@@ -15,8 +15,8 @@ import java.util.logging.Level;
 
 /**
  * Bounded write-behind decorator for sector state. The latest snapshot per sector
- * replaces older pending snapshots. Only one flush batch is in flight at a time,
- * preserving ordering when several updates for the same sector arrive together.
+ * replaces older pending snapshots. KPM overrides are explicit admin operations:
+ * callers activate them only after the delegated database write succeeds.
  */
 public final class RetryingStateStore implements StateStore {
     private static final int MAX_PENDING_SECTORS = 10_000;
@@ -41,17 +41,25 @@ public final class RetryingStateStore implements StateStore {
 
     @Override
     public CompletableFuture<List<SectorPersistentState>> loadAll() {
-        if (closed) {
-            return CompletableFuture.failedFuture(new IllegalStateException("StateStore is closed"));
-        }
+        if (closed) return CompletableFuture.failedFuture(new IllegalStateException("StateStore is closed"));
         return delegate.loadAll();
     }
 
     @Override
+    public CompletableFuture<List<SectorOverride>> loadOverrides() {
+        if (closed) return CompletableFuture.failedFuture(new IllegalStateException("StateStore is closed"));
+        return delegate.loadOverrides();
+    }
+
+    @Override
+    public CompletableFuture<Void> saveOverride(SectorOverride override) {
+        if (closed) return CompletableFuture.failedFuture(new IllegalStateException("StateStore is closed"));
+        return delegate.saveOverride(override);
+    }
+
+    @Override
     public CompletableFuture<Void> save(SectorPersistentState state) {
-        if (closed) {
-            return CompletableFuture.failedFuture(new IllegalStateException("StateStore is closed"));
-        }
+        if (closed) return CompletableFuture.failedFuture(new IllegalStateException("StateStore is closed"));
 
         CompletableFuture<Void> result = new CompletableFuture<>();
         synchronized (lock) {
@@ -76,22 +84,14 @@ public final class RetryingStateStore implements StateStore {
         return result;
     }
 
-    /**
-     * Persists a bounded batch without blocking the caller. Newer writes arriving
-     * during this batch remain queued and are flushed only after this batch finishes.
-     */
     private void flushPending() {
-        if (closed || !plugin.isEnabled() || !flushInProgress.compareAndSet(false, true)) {
-            return;
-        }
+        if (closed || !plugin.isEnabled() || !flushInProgress.compareAndSet(false, true)) return;
 
         List<Snapshot> batch = new ArrayList<>(BATCH_SIZE);
         synchronized (lock) {
             for (PendingWrite write : pending.values()) {
                 batch.add(new Snapshot(write, write.state, write.revision));
-                if (batch.size() == BATCH_SIZE) {
-                    break;
-                }
+                if (batch.size() == BATCH_SIZE) break;
             }
         }
 
@@ -101,40 +101,24 @@ public final class RetryingStateStore implements StateStore {
         }
 
         @SuppressWarnings("unchecked")
-        CompletableFuture<Boolean>[] writes = batch.stream()
-                .map(this::persistSnapshot)
+        CompletableFuture<Boolean>[] writes = batch.stream().map(this::persistSnapshot)
                 .toArray(CompletableFuture[]::new);
 
         CompletableFuture.allOf(writes).whenComplete((ignored, aggregateError) -> {
             flushInProgress.set(false);
-            if (closed || !plugin.isEnabled()) {
-                return;
-            }
+            if (closed || !plugin.isEnabled()) return;
 
             boolean failed = false;
             for (CompletableFuture<Boolean> write : writes) {
-                try {
-                    if (!write.join()) {
-                        failed = true;
-                    }
-                } catch (RuntimeException exception) {
-                    failed = true;
-                }
+                try { if (!write.join()) failed = true; }
+                catch (RuntimeException exception) { failed = true; }
             }
 
             boolean hasPending;
-            synchronized (lock) {
-                hasPending = !pending.isEmpty();
-            }
-
-            if (!hasPending) {
-                retryDelaySeconds = 5;
-            } else if (failed) {
-                scheduleRetry();
-            } else {
-                // More than one batch may be queued. Continue without an extra delay.
-                flushPending();
-            }
+            synchronized (lock) { hasPending = !pending.isEmpty(); }
+            if (!hasPending) retryDelaySeconds = 5;
+            else if (failed) scheduleRetry();
+            else flushPending();
         });
     }
 
@@ -157,14 +141,9 @@ public final class RetryingStateStore implements StateStore {
     private void completeSnapshot(Snapshot snapshot) {
         List<CompletableFuture<Void>> completed = new ArrayList<>();
         synchronized (lock) {
-            if (closed) {
-                return;
-            }
-
+            if (closed) return;
             PendingWrite current = pending.get(snapshot.state.sectorId());
-            if (current != snapshot.pending) {
-                return;
-            }
+            if (current != snapshot.pending) return;
 
             Iterator<Waiter> iterator = current.waiters.iterator();
             while (iterator.hasNext()) {
@@ -174,7 +153,6 @@ public final class RetryingStateStore implements StateStore {
                     iterator.remove();
                 }
             }
-
             if (current.revision == snapshot.revision) {
                 pending.remove(snapshot.state.sectorId());
             }
@@ -183,16 +161,12 @@ public final class RetryingStateStore implements StateStore {
     }
 
     private void scheduleRetry() {
-        if (closed || !plugin.isEnabled() || !retryScheduled.compareAndSet(false, true)) {
-            return;
-        }
-
+        if (closed || !plugin.isEnabled() || !retryScheduled.compareAndSet(false, true)) return;
         Runnable schedule = () -> {
             if (closed || !plugin.isEnabled()) {
                 retryScheduled.set(false);
                 return;
             }
-
             int delay = retryDelaySeconds;
             retryDelaySeconds = Math.min(retryDelaySeconds * 2, 300);
             timers.schedule("state-store-retry", "database", delay * 20L, () -> {
@@ -200,40 +174,29 @@ public final class RetryingStateStore implements StateStore {
                 flushPending();
             });
         };
-
-        if (Bukkit.isPrimaryThread()) {
-            schedule.run();
-        } else {
+        if (Bukkit.isPrimaryThread()) schedule.run();
+        else {
             try {
                 Bukkit.getScheduler().runTask(plugin, schedule);
             } catch (IllegalStateException exception) {
                 retryScheduled.set(false);
-                if (!closed) {
-                    plugin.getLogger().warning("Could not schedule database retry: " + exception.getMessage());
-                }
+                if (!closed) plugin.getLogger().warning("Could not schedule database retry: " + exception.getMessage());
             }
         }
     }
 
     private void warnDatabaseUnavailable(Throwable error) {
         long now = System.nanoTime();
-        if (now - lastWarningNanos < 60_000_000_000L) {
-            return;
-        }
+        if (now - lastWarningNanos < 60_000_000_000L) return;
         lastWarningNanos = now;
-
         Throwable cause = error;
-        while (cause.getCause() != null) {
-            cause = cause.getCause();
-        }
+        while (cause.getCause() != null) cause = cause.getCause();
         plugin.getLogger().log(Level.WARNING,
                 "MySQL is unavailable; sector state writes are queued for retry", cause);
     }
 
     public int pendingSectors() {
-        synchronized (lock) {
-            return pending.size();
-        }
+        synchronized (lock) { return pending.size(); }
     }
 
     @Override
@@ -242,13 +205,10 @@ public final class RetryingStateStore implements StateStore {
         List<CompletableFuture<Void>> waiters = new ArrayList<>();
         synchronized (lock) {
             for (PendingWrite write : pending.values()) {
-                for (Waiter waiter : write.waiters) {
-                    waiters.add(waiter.future);
-                }
+                for (Waiter waiter : write.waiters) waiters.add(waiter.future);
             }
             pending.clear();
         }
-
         IllegalStateException failure = new IllegalStateException(
                 "Plugin disabled before queued state writes could be persisted");
         waiters.forEach(future -> future.completeExceptionally(failure));
@@ -259,10 +219,7 @@ public final class RetryingStateStore implements StateStore {
         private SectorPersistentState state;
         private long revision;
         private final List<Waiter> waiters = new ArrayList<>();
-
-        private PendingWrite(SectorPersistentState state) {
-            this.state = state;
-        }
+        private PendingWrite(SectorPersistentState state) { this.state = state; }
     }
 
     private record Waiter(long revision, CompletableFuture<Void> future) { }
