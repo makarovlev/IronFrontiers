@@ -68,6 +68,7 @@ final class LongObjectMap<V> {
         return slot;
     }
 
+    @SuppressWarnings("unchecked")
     private void resize() {
         long[] oldKeys = keys;
         Object[] oldValues = values;
@@ -75,7 +76,7 @@ final class LongObjectMap<V> {
         allocate(oldKeys.length << 1);
         for (int i = 0; i < oldKeys.length; i++) {
             if (oldOccupied[i]) {
-                put(oldKeys[i], oldValues[i]);
+                put(oldKeys[i], (V) oldValues[i]);
             }
         }
     }
