@@ -88,6 +88,51 @@ class SectorStateMachineTest {
     }
 
     @Test
+    void resumeWindowFreezesWhenEmptyAndReusesSavedDestructionRemainder() {
+        SectorRuntimeState held = new SectorRuntimeState(SectorState.HELD, null, 0,
+                4L, 10, 0, 0, 5, false);
+
+        var frozen = SectorStateMachine.tick(held, policy(true, false),
+                229, 5, false, 0);
+        assertEquals(SectorState.HELD, frozen.state().state());
+        assertEquals(4L, frozen.state().destructionSavedSeconds());
+        assertEquals(10L, frozen.state().resumeWindowLeftSeconds());
+
+        var resumed = SectorStateMachine.tick(frozen.state(), policy(true, false),
+                229, 5, false, 1);
+        assertEquals(SectorState.DESTRUCTION, resumed.state().state());
+        assertEquals(4L, resumed.state().stateLeftSeconds());
+        assertEquals(5L, resumed.state().resumeWindowLeftSeconds());
+    }
+
+    @Test
+    void newCaptureClearsAnyOldSavedDestructionRemainder() {
+        SectorRuntimeState enemy = new SectorRuntimeState(SectorState.ENEMY, null, 0,
+                7L, 50, 0, 0, 11, false);
+        var captured = SectorStateMachine.tick(enemy, policy(false, false),
+                450, 1, false, 1);
+
+        assertEquals(SectorState.SAFE, captured.state().state());
+        assertNull(captured.state().destructionSavedSeconds());
+        assertEquals(0L, captured.state().resumeWindowLeftSeconds());
+        assertEquals(12L, captured.state().version());
+    }
+
+    @Test
+    void safeTimerAndOccupationFreezeWhenServerIsEmpty() {
+        SectorRuntimeState safe = new SectorRuntimeState(SectorState.SAFE, 7L, 0,
+                null, 0, 0, 0, 1, false);
+        SectorRuntimeState enemy = new SectorRuntimeState(SectorState.ENEMY, null, 7,
+                null, 0, 0, 1, 0, false);
+
+        var safeResult = SectorStateMachine.tick(safe, policy(true, false), 0, 5, false, 0);
+        var enemyResult = SectorStateMachine.tick(enemy, policy(true, false), 0, 5, false, 0);
+
+        assertEquals(7L, safeResult.state().stateLeftSeconds());
+        assertEquals(7L, enemyResult.state().occupationLeftSeconds());
+    }
+
+    @Test
     void startupAndFreezeWhenEmptyPauseOnlyLossPaths() {
         SectorRuntimeState destruction = new SectorRuntimeState(SectorState.DESTRUCTION, 5L, 12,
                 null, 0, 0, 0, 3, false);

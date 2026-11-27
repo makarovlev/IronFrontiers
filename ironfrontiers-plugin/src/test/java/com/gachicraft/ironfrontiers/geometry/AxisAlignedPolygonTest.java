@@ -78,6 +78,44 @@ class AxisAlignedPolygonTest {
     }
 
     @Test
+    void rasterizesTShapedContour() {
+        RasterizedSector sector = AxisAlignedPolygon.rasterize(List.of(
+                new GridPoint(0, 0), new GridPoint(6, 0), new GridPoint(6, 1),
+                new GridPoint(4, 1), new GridPoint(4, 4), new GridPoint(2, 4),
+                new GridPoint(2, 1), new GridPoint(0, 1)));
+
+        assertEquals(23L, sector.area());
+        assertEquals(List.of(new IntInterval(0, 6)), sector.rows().get(0));
+        assertEquals(List.of(new IntInterval(0, 6)), sector.rows().get(1));
+        for (int z = 2; z <= 4; z++) {
+            assertEquals(List.of(new IntInterval(2, 4)), sector.rows().get(z));
+        }
+        assertEquals(List.of(new IntRect(0, 0, 6, 1), new IntRect(2, 2, 4, 4)),
+                sector.rectangles());
+    }
+
+    @Test
+    void rasterizesToothedCombContour() {
+        RasterizedSector sector = AxisAlignedPolygon.rasterize(List.of(
+                new GridPoint(0, 0), new GridPoint(10, 0), new GridPoint(10, 2),
+                new GridPoint(8, 2), new GridPoint(8, 5), new GridPoint(6, 5),
+                new GridPoint(6, 2), new GridPoint(4, 2), new GridPoint(4, 5),
+                new GridPoint(2, 5), new GridPoint(2, 2), new GridPoint(0, 2)));
+
+        assertEquals(51L, sector.area());
+        for (int z = 0; z <= 2; z++) {
+            assertEquals(List.of(new IntInterval(0, 10)), sector.rows().get(z));
+        }
+        for (int z = 3; z <= 5; z++) {
+            assertEquals(List.of(new IntInterval(2, 4), new IntInterval(6, 8)),
+                    sector.rows().get(z));
+        }
+        assertEquals(List.of(new IntRect(0, 0, 10, 2),
+                        new IntRect(2, 3, 4, 5), new IntRect(6, 3, 8, 5)),
+                sector.rectangles());
+    }
+
+    @Test
     void rejectsDiagonalDuplicateAndReversingEdges() {
         assertThrows(IllegalArgumentException.class, () -> AxisAlignedPolygon.rasterize(List.of(
                 new GridPoint(0, 0), new GridPoint(2, 1), new GridPoint(2, 2))));
