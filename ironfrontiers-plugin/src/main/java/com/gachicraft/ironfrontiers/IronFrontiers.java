@@ -8,17 +8,21 @@ import com.gachicraft.ironfrontiers.integration.IntegrationRegistry;
 import com.gachicraft.ironfrontiers.sector.*;
 import com.gachicraft.ironfrontiers.storage.*;
 import com.gachicraft.ironfrontiers.util.CentralTimerScheduler;
+import com.gachicraft.ironfrontiers.mobs.NoopMobSpawn;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** Plugin lifecycle and manual dependency bootstrap. */
+/** Plugin lifecycle and explicit dependency bootstrap. */
 public final class IronFrontiers extends JavaPlugin {
     private final ServiceRegistry services = new ServiceRegistry();
     private ConfigManager configs;
     private ExecutorPools executors;
     private CentralTimerScheduler timers;
     private DatabaseHandle database;
+    private SectorRuntimeController sectorController;
     private boolean databaseReady;
     private boolean databaseInitializationInProgress;
     private boolean initialDatabaseAttempt = true;
@@ -42,20 +46,24 @@ public final class IronFrontiers extends JavaPlugin {
             timers.start();
             services.register(CentralTimerScheduler.class, timers);
 
-            services.register(Authority.class, new AlwaysLeader());
-            services.register(KpmSource.class, new LocalKpmSource());
-            services.register(StateBroadcaster.class, new NoopBroadcaster());
-            services.register(PlayerCountSource.class, new LocalPlayerCountSource(getServer()));
+            Authority authority = new AlwaysLeader();
+            PlayerCountSource playerCount = new LocalPlayerCountSource(getServer());
+            StateBroadcaster broadcaster = new NoopBroadcaster();
+            services.register(Authority.class, authority);
+            services.register(StateBroadcaster.class, broadcaster);
+            services.register(PlayerCountSource.class, playerCount);
 
             IntegrationRegistry integrations = new IntegrationRegistry(getServer().getPluginManager());
             integrations.logAvailability(getLogger());
             services.register(IntegrationRegistry.class, integrations);
 
             if (getServer().getPluginManager().isPluginEnabled("PrivateMobsX")) {
-                getLogger().warning("PrivateMobsX is present, but the public SPI from section 18.1 is not registered yet; private mob features remain disabled.");
+                getLogger().info("PrivateMobsX detected; its public API will be connected in stage 3B.");
             }
 
-            CommandRegistrar.register(this, configs);
+            // Register early so /if reload and the database-unavailable message work
+            // even when MySQL is not reachable during startup.
+            CommandRegistrar.register(this, configs, () -> sectorController, () -> databaseReady);
             startDatabaseInitialization();
             getLogger().info("Iron Frontiers bootstrap started (Java " + Runtime.version().feature() + ")");
         } catch (Exception exception) {
@@ -85,24 +93,59 @@ public final class IronFrontiers extends JavaPlugin {
                     scheduleDatabaseRetry();
                     return;
                 }
-                handle.stateStore().loadAll().whenComplete((states, loadError) -> {
+
+                CompletableFuture<List<SectorPersistentState>> states = handle.stateStore().loadAll();
+                CompletableFuture<List<SectorOverride>> overrides = handle.stateStore().loadOverrides();
+                states.thenCombine(overrides, LoadedDatabase::new).whenComplete((loaded, loadError) -> {
                     if (!isEnabled()) {
                         handle.close();
                         return;
                     }
                     getServer().getScheduler().runTask(this, () -> {
+                        if (!isEnabled()) {
+                            handle.close();
+                            return;
+                        }
                         if (loadError != null) {
                             handle.close();
                             reportDatabaseFailure(loadError);
                             scheduleDatabaseRetry();
                             return;
                         }
-                        StateStore reliableStore = new RetryingStateStore(this, handle.stateStore(), timers);
-                        database = new DatabaseHandle(handle.dataSource(), reliableStore);
-                        services.register(StateStore.class, reliableStore);
-                        databaseReady = true;
-                        nextDatabaseRetrySeconds = 5;
-                        getLogger().info("MySQL connected; loaded " + states.size() + " persisted sector state(s)");
+
+                        try {
+                            StateStore reliableStore = new RetryingStateStore(this, handle.stateStore(), timers);
+                            SectorConfigLoader.LoadResult definitions =
+                                    new SectorConfigLoader(getServer(), getLogger())
+                                            .load(configs.sectors(), configs.config());
+                            SectorRuntimeController controller = new SectorRuntimeController(
+                                    this, configs, reliableStore, timers,
+                                    services.require(Authority.class),
+                                    services.require(PlayerCountSource.class),
+                                    new NoopMobSpawn());
+                            controller.initialize(definitions.registry(), loaded.states(), loaded.overrides());
+
+                            database = new DatabaseHandle(handle.dataSource(), reliableStore);
+                            sectorController = controller;
+                            services.register(StateStore.class, reliableStore);
+                            services.register(SectorRegistry.class, controller.registry());
+                            services.register(SectorRuntimeController.class, controller);
+                            services.register(com.gachicraft.ironfrontiers.kpm.KpmTracker.class,
+                                    controller.kpmTracker());
+                            services.register(com.gachicraft.ironfrontiers.sector.KpmSource.class,
+                                    controller.kpmTracker());
+
+                            databaseReady = true;
+                            nextDatabaseRetrySeconds = 5;
+                            getLogger().info("MySQL connected; loaded " + loaded.states().size()
+                                    + " persisted sector state(s), " + loaded.overrides().size() + " KPM override(s)");
+                        } catch (Exception exception) {
+                            handle.close();
+                            getLogger().log(java.util.logging.Level.SEVERE,
+                                    "Could not initialize sector runtime; mechanics remain disabled", exception);
+                            reportDatabaseFailure(exception);
+                            scheduleDatabaseRetry();
+                        }
                     });
                 });
             });
@@ -111,7 +154,10 @@ public final class IronFrontiers extends JavaPlugin {
 
     private void reportDatabaseFailure(Throwable error) {
         Throwable cause = error;
-        while (cause.getCause() != null) cause = cause.getCause();
+        while ((cause instanceof CompletionException || cause.getCause() != null)
+                && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
         long now = System.nanoTime();
         if (initialDatabaseAttempt || now - lastDatabaseWarningNanos >= 60_000_000_000L) {
             if (initialDatabaseAttempt) {
@@ -130,20 +176,39 @@ public final class IronFrontiers extends JavaPlugin {
         timers.schedule("database-retry", "infrastructure", delay * 20L, this::startDatabaseInitialization);
     }
 
-    public boolean isDatabaseReady() { return databaseReady; }
+    public boolean isDatabaseReady() {
+        return databaseReady;
+    }
+
+    public SectorRuntimeController sectorController() {
+        return sectorController;
+    }
 
     @Override
     public void onDisable() {
-        if (timers != null) timers.close();
-        if (database != null) {
-            database.close();
-            database = null;
+        if (sectorController != null) {
+            sectorController.close();
+            // The bounded DB executor remains alive until queued state snapshots flush.
+            sectorController.persistAll();
         }
+        if (timers != null) timers.close();
         if (executors != null) {
             executors.close();
             executors = null;
         }
+        if (database != null) {
+            database.close();
+            database = null;
+        }
         services.clear();
         getLogger().info("Iron Frontiers disabled");
+    }
+
+    private record LoadedDatabase(List<SectorPersistentState> states,
+                                  List<SectorOverride> overrides) {
+        private LoadedDatabase {
+            states = List.copyOf(states);
+            overrides = List.copyOf(overrides);
+        }
     }
 }

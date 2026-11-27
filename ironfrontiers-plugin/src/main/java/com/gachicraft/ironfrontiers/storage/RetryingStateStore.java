@@ -85,7 +85,8 @@ public final class RetryingStateStore implements StateStore {
     }
 
     private void flushPending() {
-        if (closed || !plugin.isEnabled() || !flushInProgress.compareAndSet(false, true)) return;
+        // Shutdown still permits a final bounded flush before the DB executor is closed.
+        if (closed || !flushInProgress.compareAndSet(false, true)) return;
 
         List<Snapshot> batch = new ArrayList<>(BATCH_SIZE);
         synchronized (lock) {
@@ -106,7 +107,7 @@ public final class RetryingStateStore implements StateStore {
 
         CompletableFuture.allOf(writes).whenComplete((ignored, aggregateError) -> {
             flushInProgress.set(false);
-            if (closed || !plugin.isEnabled()) return;
+            if (closed) return;
 
             boolean failed = false;
             for (CompletableFuture<Boolean> write : writes) {

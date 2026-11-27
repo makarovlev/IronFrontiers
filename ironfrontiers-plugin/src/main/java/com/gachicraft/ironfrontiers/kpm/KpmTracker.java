@@ -33,6 +33,12 @@ public final class KpmTracker implements KpmSource {
         }
     }
 
+    /** Registers a sector discovered after a configuration reload without resetting existing windows. */
+    public void ensureSector(String sectorId) {
+        String key = normalize(sectorId);
+        sectorWindows.computeIfAbsent(key, ignored -> new KpmWindow(windowSeconds));
+    }
+
     /** Records a real owner kill and its weighted contribution to sector and player KPM. */
     public void recordKill(String sectorId, UUID playerId, int weightTenths, long nowSecond) {
         if (playerId == null) {
