@@ -53,7 +53,7 @@ class SectorGeometryIndexTest {
     void veryLargeRadiusDoesNotOverflowCoordinateBounds() {
         UUID world = UUID.randomUUID();
         SectorGeometryIndex.Builder builder = new SectorGeometryIndex.Builder();
-        builder.add(world, AxisAlignedPolygon.rasterize(List.of(new GridPoint(100, 100))));
+        builder.add(world, AxisAlignedPolygon.rasterize(List.of(new GridPoint(Integer.MIN_VALUE + 100, Integer.MIN_VALUE + 100))));
         SectorGeometryIndex index = builder.build();
 
         assertArrayEquals(new int[]{0},

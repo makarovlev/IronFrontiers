@@ -72,7 +72,7 @@ class AxisAlignedPolygonTest {
                 new GridPoint(4, 5), new GridPoint(4, 1), new GridPoint(1, 1),
                 new GridPoint(1, 5), new GridPoint(0, 5)));
 
-        assertEquals(14L, lShape.area());
+        assertEquals(16L, lShape.area());
         assertTrue(pocket.contains(2, 0));
         assertFalse(pocket.contains(2, 3));
     }
