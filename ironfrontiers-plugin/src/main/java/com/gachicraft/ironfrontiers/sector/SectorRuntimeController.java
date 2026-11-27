@@ -45,7 +45,6 @@ public final class SectorRuntimeController implements AutoCloseable {
     private SectorMessageBatcher messageBatcher;
     private int updateIntervalSeconds;
     private int persistIntervalSeconds;
-    private int persistElapsedSeconds;
     private int startupGraceLeftSeconds;
     private boolean started;
     private boolean closed;
@@ -131,6 +130,7 @@ public final class SectorRuntimeController implements AutoCloseable {
         messageBatcher = new SectorMessageBatcher(plugin, server, configs, timers);
         started = true;
         scheduleNextTick();
+        schedulePersistence();
         plugin.getLogger().info("Loaded " + registry.size() + " sector(s), KPM window "
                 + windowSeconds + "s, startup grace " + startupGraceLeftSeconds + "s");
     }
@@ -142,16 +142,21 @@ public final class SectorRuntimeController implements AutoCloseable {
         SectorRegistry nextRegistry = loaded.registry();
 
         int previousUpdateInterval = updateIntervalSeconds;
+        int previousPersistInterval = persistIntervalSeconds;
         int nextUpdateInterval = clamp(configs.config().getInt("kpm.update_interval_seconds", 1), 1, 60);
         int nextWindowSeconds = clamp(configs.config().getInt("kpm.window_seconds", 60), 1, 3600);
         int nextIdleCleanup = Math.max(1,
                 configs.config().getInt("kpm.player_idle_cleanup_seconds", 120));
-        updateIntervalSeconds = nextUpdateInterval;
-        persistIntervalSeconds = Math.max(1,
+        int nextPersistInterval = Math.max(1,
                 configs.config().getInt("state_persist_interval_seconds", 10));
+        updateIntervalSeconds = nextUpdateInterval;
+        persistIntervalSeconds = nextPersistInterval;
         kpmTracker.reconfigure(nextWindowSeconds, nextIdleCleanup);
         if (previousUpdateInterval != nextUpdateInterval) {
             timers.cancel(TICK_KEY);
+        }
+        if (previousPersistInterval != nextPersistInterval) {
+            timers.cancel(PERSIST_KEY);
         }
 
         for (SectorDefinition definition : nextRegistry.sectors()) {
@@ -193,6 +198,9 @@ public final class SectorRuntimeController implements AutoCloseable {
         kpmTracker.tick(nowSecond);
         if (previousUpdateInterval != nextUpdateInterval) {
             scheduleNextTick();
+        }
+        if (previousPersistInterval != nextPersistInterval) {
+            schedulePersistence();
         }
     }
 
@@ -241,18 +249,27 @@ public final class SectorRuntimeController implements AutoCloseable {
             }
         }
 
-        persistElapsedSeconds += dt;
-        if (persistElapsedSeconds >= persistIntervalSeconds) {
-            persistElapsedSeconds %= persistIntervalSeconds;
-            persistAll();
-        }
-
         scheduleNextTick();
     }
 
     private void scheduleNextTick() {
         if (closed || !started) return;
         timers.schedule(TICK_KEY, "sector-runtime", updateIntervalSeconds * 20L, this::tick);
+    }
+
+    /** Persistence cadence is independent from KPM/state-machine tick cadence. */
+    private void schedulePersistence() {
+        if (closed || !started) return;
+        timers.schedule(PERSIST_KEY, "sector-persistence", persistIntervalSeconds * 20L, () -> {
+            if (closed || !started) return;
+            persistAll().whenComplete((ignored, error) -> {
+                if (error != null) {
+                    plugin.getLogger().log(Level.WARNING,
+                            "Periodic sector-state persistence failed", error);
+                }
+            });
+            schedulePersistence();
+        });
     }
 
     private void processTransition(SectorDefinition definition, SectorTransition transition) {
@@ -286,8 +303,11 @@ public final class SectorRuntimeController implements AutoCloseable {
                 mobSpawn.pauseNewSpawns(definition.id(), Math.toIntExact(next.spawnPauseLeftSeconds()));
                 messageBatcher.captured(definition);
             }
-            case SAFE_ENDED_TO_HELD -> server.getPluginManager().callEvent(
-                    new SectorSafeEndedEvent(createView(definition, next)));
+            case SAFE_ENDED_TO_HELD -> {
+                if (previous.state() == SectorState.SAFE) {
+                    server.getPluginManager().callEvent(new SectorSafeEndedEvent(createView(definition, next)));
+                }
+            }
             case DESTRUCTION_STARTED -> {
                 if (previous.state() == SectorState.SAFE) {
                     server.getPluginManager().callEvent(new SectorSafeEndedEvent(createView(definition, next)));
@@ -505,6 +525,7 @@ public final class SectorRuntimeController implements AutoCloseable {
     public void close() {
         closed = true;
         timers.cancel(TICK_KEY);
+        timers.cancel(PERSIST_KEY);
         if (messageBatcher != null) messageBatcher.close();
     }
 
