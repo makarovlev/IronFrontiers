@@ -115,6 +115,10 @@ public final class SectorRuntimeController implements AutoCloseable {
             }
 
             states.put(key, state);
+            if (state.spawnPauseLeftSeconds() > 0) {
+                mobSpawn.pauseNewSpawns(definition.id(),
+                        (int) Math.min(Integer.MAX_VALUE, state.spawnPauseLeftSeconds()));
+            }
             if (persistImmediately) persistState(definition, state);
         }
 
@@ -136,6 +140,19 @@ public final class SectorRuntimeController implements AutoCloseable {
         SectorConfigLoader.LoadResult loaded = new SectorConfigLoader(server, plugin.getLogger())
                 .load(configs.sectors(), configs.config());
         SectorRegistry nextRegistry = loaded.registry();
+
+        int previousUpdateInterval = updateIntervalSeconds;
+        int nextUpdateInterval = clamp(configs.config().getInt("kpm.update_interval_seconds", 1), 1, 60);
+        int nextWindowSeconds = clamp(configs.config().getInt("kpm.window_seconds", 60), 1, 3600);
+        int nextIdleCleanup = Math.max(1,
+                configs.config().getInt("kpm.player_idle_cleanup_seconds", 120));
+        updateIntervalSeconds = nextUpdateInterval;
+        persistIntervalSeconds = Math.max(1,
+                configs.config().getInt("state_persist_interval_seconds", 10));
+        kpmTracker.reconfigure(nextWindowSeconds, nextIdleCleanup);
+        if (previousUpdateInterval != nextUpdateInterval) {
+            timers.cancel(TICK_KEY);
+        }
 
         for (SectorDefinition definition : nextRegistry.sectors()) {
             String key = normalize(definition.id());
@@ -172,6 +189,23 @@ public final class SectorRuntimeController implements AutoCloseable {
             }
         }
         registry = nextRegistry;
+        long nowSecond = (System.nanoTime() - monotonicStartNanos) / 1_000_000_000L;
+        kpmTracker.tick(nowSecond);
+        if (previousUpdateInterval != nextUpdateInterval) {
+            scheduleNextTick();
+        }
+    }
+
+    /** Sector ids whose geometry/other restart-only values must remain unchanged on /if reload. */
+    public Set<String> nonEnemySectorIds() {
+        ensureReady();
+        Set<String> result = new HashSet<>();
+        for (Map.Entry<String, SectorRuntimeState> entry : states.entrySet()) {
+            if (entry.getValue().state() != SectorState.ENEMY) {
+                result.add(entry.getKey());
+            }
+        }
+        return Set.copyOf(result);
     }
 
     public void tickNow() {

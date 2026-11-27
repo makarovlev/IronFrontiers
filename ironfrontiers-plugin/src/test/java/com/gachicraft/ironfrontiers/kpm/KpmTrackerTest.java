@@ -48,6 +48,24 @@ class KpmTrackerTest {
     }
 
     @Test
+    void reconfigurationResizesExistingSectorAndPersonalWindows() {
+        UUID player = UUID.randomUUID();
+        KpmTracker tracker = new KpmTracker(List.of("aa01"), 5, 120);
+        tracker.recordKill("aa01", player, 10, 1);
+        tracker.recordKill("aa01", player, 20, 2);
+        tracker.recordKill("aa01", player, 30, 3);
+        tracker.tick(3);
+
+        tracker.reconfigure(2, 10);
+        tracker.tick(3);
+        assertEquals(5.0, tracker.kpm("aa01"), 0.00001);
+        assertEquals(5.0, tracker.playerKpm(player, "aa01"), 0.00001);
+
+        tracker.tick(13);
+        assertEquals(0.0, tracker.playerKpm(player, "aa01"));
+    }
+
+    @Test
     void publishesImmutableSnapshots() {
         KpmTracker tracker = new KpmTracker(List.of("aa01"), 60, 120);
         tracker.tick(100);

@@ -35,6 +35,22 @@ class KpmWindowTest {
     }
 
     @Test
+    void resizingPreservesOnlyTheNewestBuckets() {
+        KpmWindow window = new KpmWindow(5);
+        window.add(10, 1);
+        window.add(20, 2);
+        window.add(30, 3);
+
+        window.resize(2);
+        assertEquals(50L, window.sumTenths(3));
+
+        window.resize(5);
+        assertEquals(50L, window.sumTenths(3));
+        window.add(40, 4);
+        assertEquals(90L, window.sumTenths(4));
+    }
+
+    @Test
     void rejectsNegativeWeightsAndNonMonotonicTime() {
         KpmWindow window = new KpmWindow(60);
         assertThrows(IllegalArgumentException.class, () -> window.add(-1, 0));

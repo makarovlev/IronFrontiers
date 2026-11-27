@@ -44,13 +44,15 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args[0].equalsIgnoreCase("reload") && args.length == 1) {
-            ReloadReport report = configs.reload();
+            SectorRuntimeController controller = controllerSupplier.get();
+            Set<String> protectedSectors = databaseReady.getAsBoolean() && controller != null
+                    ? controller.nonEnemySectorIds() : null;
+            ReloadReport report = configs.reload(protectedSectors);
             Messages updated = new Messages(configs.messages());
             updated.send(sender, "general.reload_done");
             for (String path : report.restartRequired()) {
                 updated.send(sender, "general.reload_restart_required", Map.of("param", path));
             }
-            SectorRuntimeController controller = controllerSupplier.get();
             if (databaseReady.getAsBoolean() && controller != null) {
                 try {
                     controller.reloadDefinitions();

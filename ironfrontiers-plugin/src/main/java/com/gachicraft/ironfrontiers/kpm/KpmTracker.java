@@ -10,8 +10,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * immutable snapshots published through AtomicReference, without touching windows.
  */
 public final class KpmTracker implements KpmSource {
-    private final int windowSeconds;
-    private final int playerIdleCleanupSeconds;
+    private int windowSeconds;
+    private int playerIdleCleanupSeconds;
     private final Map<String, KpmWindow> sectorWindows = new LinkedHashMap<>();
     private final Map<UUID, Map<String, PersonalWindow>> personalWindows = new HashMap<>();
     private final AtomicReference<Map<String, SectorKpmSnapshot>> sectorSnapshots =
@@ -31,6 +31,25 @@ public final class KpmTracker implements KpmSource {
                 throw new IllegalArgumentException("Duplicate KPM sector id: " + id);
             }
         }
+    }
+
+    /** Resizes existing sector and personal windows without discarding still-current buckets. */
+    public void reconfigure(int newWindowSeconds, int newPlayerIdleCleanupSeconds) {
+        if (newWindowSeconds < 1 || newPlayerIdleCleanupSeconds < 1) {
+            throw new IllegalArgumentException("KPM durations must be positive");
+        }
+        if (newWindowSeconds != windowSeconds) {
+            for (KpmWindow window : sectorWindows.values()) {
+                window.resize(newWindowSeconds);
+            }
+            for (Map<String, PersonalWindow> bySector : personalWindows.values()) {
+                for (PersonalWindow personal : bySector.values()) {
+                    personal.window.resize(newWindowSeconds);
+                }
+            }
+            windowSeconds = newWindowSeconds;
+        }
+        playerIdleCleanupSeconds = newPlayerIdleCleanupSeconds;
     }
 
     /** Registers a sector discovered after a configuration reload without resetting existing windows. */

@@ -7,7 +7,7 @@ import java.util.Arrays;
  * add/sum are O(1) amortized and use only primitive arrays.
  */
 public final class KpmWindow {
-    private final int[] buckets;
+    private int[] buckets;
     private long totalTenths;
     private long currentSecond;
     private boolean initialized;
@@ -40,6 +40,37 @@ public final class KpmWindow {
 
     public int windowSeconds() {
         return buckets.length;
+    }
+
+    /**
+     * Resizes the window while preserving only bucket values still inside the
+     * newest min(oldSize,newSize) seconds. Called on the server thread during /if reload.
+     */
+    public void resize(int newWindowSeconds) {
+        if (newWindowSeconds < 1) {
+            throw new IllegalArgumentException("windowSeconds must be positive");
+        }
+        if (newWindowSeconds == buckets.length) {
+            return;
+        }
+
+        int[] resized = new int[newWindowSeconds];
+        long resizedTotal = 0L;
+        if (initialized) {
+            int retainedSeconds = Math.min(buckets.length, newWindowSeconds);
+            for (int offset = 0; offset < retainedSeconds; offset++) {
+                long second = currentSecond - offset;
+                int value = buckets[index(second)];
+                if (value != 0) {
+                    int target = (int) Math.floorMod(second, (long) newWindowSeconds);
+                    resized[target] = Math.addExact(resized[target], value);
+                    resizedTotal = Math.addExact(resizedTotal, value);
+                }
+            }
+        }
+
+        buckets = resized;
+        totalTenths = resizedTotal;
     }
 
     private void advance(long nowSecond) {
