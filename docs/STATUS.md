@@ -1,38 +1,43 @@
 # Статус разработки Iron Frontiers
 
-Последнее обновление: 2026-11-26
+Последнее обновление: 2026-11-27
 
 | Возможность | Статус | Как проверить |
 |---|---|---|
-| Инициализация Git, README, полный docs/PLAN.txt и отчётные файлы | готово | Проверить наличие файлов; docs/PLAN.txt — точная копия исходного ТЗ |
-| Maven baseline в main | проверено CI | Main run #7: `mvn -B verify` завершился success |
-| Maven multi-module: parent + API + plugin | проверено CI | Feature run #8: `mvn -B verify` на JDK 21 |
-| Java 21 Enforcer и GitHub Actions CI | проверено | Feature run #8 завершился success |
-| Публичные DTO и события API | проверено CI | API-модуль компилируется; consumer-плагин будет проверен на этапе 4 |
-| plugin.yml, /if reload, TAB skeleton | готово (каркас) | Запустить Purpur 1.20.6 с PrivateMobsX; проверить aliases, permission и /if reload |
-| Шесть YAML-файлов с русскими комментариями | готово (шаблоны) | Первый запуск создаёт config.yml, messages.yml, sectors.yml, mobs.yml, blueprints.yml, menus.yml |
-| ConfigManager, валидаторы, restart-required reload | готово (исходный код) | Изменить database.host и transform.tick_budget_ms; /if reload удерживает первое значение и применяет второе |
-| Messages: MiniMessage + legacy &-коды и prefix | готово (исходный код) | Проверить сообщение в обоих форматах на сервере |
-| YamlTextEditor и JUnit 5 тесты | проверено CI | Feature run #8: тесты YamlTextEditor прошли в составе `mvn -B verify` |
-| Центральный планировщик и именованные пулы | готово (исходный код) | Проверить одну Bukkit-задачу, freeze/resume; Redis executor отсутствует при multiserver.enabled=false |
-| MySQL Hikari, if_schema, if_sector_state, StateStore | готово (исходный код; live DB не проверена) | Подключить тестовую MySQL; ожидается применение миграции и загрузка строк |
-| Runtime DB outage: bounded write-behind и exponential retry | готово (исходный код; live outage не проверен) | Остановить MySQL после запуска; проверить очередь, восстановление и WARNING не чаще раза в минуту |
-| Soft-dependency adapters | каркас готов | Запускать без каждого softdepend; ожидается WARNING, сам IronFrontiers не отключается |
-| PrivateMobsX SPI | ожидает согласования | См. docs/QUESTIONS.md и docs/decisions/001-privatemobsx-integration.md |
-| Геометрия, KPM и автомат состояний | не начато | Этап 2 |
-| Выделение, спавн и трансформация территории | не начато | Этап 3 |
+| Maven multi-module, Java 21, CI | принято на этапе 1 | GitHub Actions `mvn -B verify`; владелец подтвердил запуск плагина на сервере |
+| Полная копия исходного ТЗ | проверено | Git blob SHA исходного файла и `docs/PLAN.txt` совпадают |
+| Конфиги, reload, Messages, интеграционные адаптеры | принято на этапе 1 | Ручной запуск Purpur 1.20.6 подтверждён владельцем |
+| MySQL StateStore, HikariCP, миграция v1, retry queue | принято на этапе 1 | Проверка live DB outage остаётся отдельным эксплуатационным тестом |
+| Геометрия секторов, осевые контуры, растеризация строками | реализовано; CI success | 36-клеточный пример, линии, L/T/зубчатая/карманная формы, невалидные контуры |
+| Прямоугольники, ChunkIndex, sectorAt/sectorsNear/distance/area | реализовано; CI success | Тесты отрицательных чанков, пересечений, отрицательных/крайних координат и больших радиусов |
+| Загрузка sectors.yml и SectorRegistry | реализовано; CI success | Проверка ID, мира, WorldBorder, координат, порогов, таймеров, независимого отключения битого сектора |
+| SurfaceResolver | реализовано; CI success | Возвращает верх collision shape только в уже загруженном чанке; ручная проверка блоков с частичной коллизией ожидает Purpur |
+| KpmWindow/KpmTracker | реализовано; CI success | Скользящие бакеты, пропуски времени, десятые доли, личные/секторные снимки, idle cleanup, resize окна |
+| Автомат ENEMY/SAFE/HELD/DESTRUCTION | реализовано; CI success | Таблица переходов, capture, safe expiry, held, destruction, anti-flap, loss, occupation, infinite_safe |
+| Холостой старт и freeze_when_empty | реализовано; CI success | Unit-тесты; фактическое поведение на пустом тестовом сервере ожидает ручной проверки |
+| События Bukkit и пакетные сообщения | реализовано; CI success | События на переходах; объединение потерь/разрушений по batch window ожидает проверки в игре |
+| MySQL if_sector_state + if_sector_override | реализовано; CI success | Миграция v2, загрузка, новые ENEMY rows, orphan warnings, override persistence |
+| Периодическое сохранение и остановка сервера | реализовано; CI success | Отдельный timer от KPM tick; финальный flush ожидает live-проверки с MySQL |
+| /if debug kill, /if debug state, /if sectors set | реализовано; CI success | Включить `debug: true`, проверить debug и сохранение override в MySQL |
+| Фактическая приёмка Stage 2 на Purpur 1.20.6 | ожидает владельца | См. чек-лист в docs/TESTING.md |
+| Spark: 100 фиктивных секторов, тик автомата <0,3 мс | не измерено | Требуется замер на тестовом сервере с Spark; CI не заменяет профилирование |
+| Интеграция PrivateMobsX API | запланирована на 3B | Публичный контракт находится в `makarovlev/PrivateMobsX:feature/privatemobsx-api` |
+| Выделение палкой, /if sectors list/info/tp/show/create/delete | не начато | Этап 3A |
+| FormationCalculator, SpawnDirector, PrivateMobsX spawn/death | не начато | Этап 3B |
+| Трансформация мира, откат секторов и сирот | не начато | Этап 3C |
 | PlaceholderAPI и consumer API tests | не начато | Этап 4 |
 | Форпосты и меню | не начато | Этап 5 |
 | Redis и многосерверность | не начато | Этап 6 |
 | Итоговая Wiki | не начато | Этап 7 |
 
-## Производительность
+## Проверки Stage 2
 
-Замеры Spark пока не проводились: тестовый Purpur 1.20.6 и копия war world не предоставлены. Бюджет <0,5 мс/тик не считается подтверждённым до профилирования.
+- Последний подтверждённый GitHub Actions run #36: `mvn -B verify` — success.
+- Unit-тесты выполняются на чистой Java-логике; Bukkit/Purpur интеграционные сценарии остаются в ручном чек-листе.
+- Не считать Spark-бюджет <0,3 мс/тик подтверждённым до профилирования.
 
-## Ограничения приёмки этапа 1
+## Ограничения Stage 2
 
-- CI-компиляция и JUnit подтверждены GitHub Actions.
-- Фактический запуск на Purpur 1.20.6 и подключение к тестовой MySQL в этой среде не выполнялись.
-- Runtime-адаптер PrivateMobsX нельзя завершить без согласованного публичного SPI.
-- LICENSE не добавлен: лицензию должен выбрать владелец репозитория.
+- `MobSpawn` пока является заглушкой по плану; реальное управление мобами подключается на 3B через публичный API PrivateMobsX.
+- `/if sectors list/info/tp/show/create/delete` относятся к этапу 3A.
+- Трансформация мира, автоматическое восстановление и откат сирот относятся к 3C и не реализуются на этапе 2.
