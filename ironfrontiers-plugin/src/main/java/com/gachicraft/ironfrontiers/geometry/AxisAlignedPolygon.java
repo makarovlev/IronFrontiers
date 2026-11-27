@@ -99,7 +99,7 @@ public final class AxisAlignedPolygon {
 
     private static RasterizedSector line(GridPoint first, GridPoint second) {
         if (first.equals(second)) {
-            return singleCell(first);
+            throw new IllegalArgumentException("A two-vertex line must have distinct endpoints");
         }
         if (first.x() == second.x()) {
             int min = Math.min(first.z(), second.z());

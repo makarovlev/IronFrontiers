@@ -31,6 +31,13 @@ class AxisAlignedPolygonTest {
     }
 
     @Test
+    void rejectsTwoIdenticalVerticesInsteadOfTreatingThemAsASingleCell() {
+        GridPoint point = new GridPoint(7, -2);
+        assertThrows(IllegalArgumentException.class,
+                () -> AxisAlignedPolygon.rasterize(List.of(point, point)));
+    }
+
+    @Test
     void handlesMonotoneMultiVertexLines() {
         RasterizedSector horizontal = AxisAlignedPolygon.rasterize(List.of(
                 new GridPoint(0, 5), new GridPoint(2, 5), new GridPoint(7, 5)));
