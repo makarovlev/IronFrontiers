@@ -11,7 +11,7 @@ general:
   db_unavailable: "<red>База данных недоступна. Игровые механики временно отключены."
   multiserver_forbidden: "<red>Эта операция запрещена в многосерверном режиме."
   usage:
-    root: "<yellow>Использование: /if reload"
+    root: "<yellow>Использование: /if reload|sectors|debug|agree"
     reload: "<yellow>Использование: /if reload"
     sectors: "<yellow>Использование: /if sectors create|list|info|tp|show|delete|set|rescan"
     mobs: "<yellow>Использование: /if mobs"
@@ -24,6 +24,16 @@ sector:
   name_exists: "<red>Сектор с таким именем уже существует."
   list_header: "<gold>Список секторов:"
   line: "<gray>• <white>{sector}</white> — {state} <dark_gray>(KPM: {kpm}, пороги: {capture}/{held}, игроков: {players}, форпост: {stronghold})"
+  states:
+    enemy: "<red>Вражеский"
+    safe: "<green>Безопасный"
+    held: "<gold>Удерживается"
+    destruction: "<red>Разрушается"
+  thresholds:
+    capture: "захват"
+    held: "удержание"
+  stronghold:
+    not_built: "не построен"
   info:
     header: "<gold>Информация о секторе {sector}"
     world: "<gray>Мир: <white>{world}"
@@ -62,7 +72,7 @@ selection:
   point_removed: "<yellow>Последняя вершина удалена."
   err_world: "<red>Нельзя выделять сектор в другом мире."
   err_axis: "<red>Следующая вершина должна лежать на X={px} или Z={pz}."
-  err_close_axis: "<red>Последняя точка должна иметь X={x0} или Z={z0}."
+  err_close_axis: "<red>Последняя точка должна иметь X={x} или Z={z}."
   err_overlap_edge: "<red>Новое ребро пересекает или касается несмежного ребра."
   err_reverse: "<red>Ребро разворачивается на 180 градусов."
   err_intersects_sector: "<red>Территория пересекается с сектором {sector}."
