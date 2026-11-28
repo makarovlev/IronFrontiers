@@ -44,7 +44,13 @@ public final class ConfigManager {
         return new ReloadReport(List.of(), warnings);
     }
 
-    public ReloadReport reload() {
+    public ReloadReport reload() { return reload(null); }
+
+    /**
+     * Reloads restart-only sector geometry for ENEMY sectors only. A null set means
+     * the database/runtime state is unknown, so existing sectors are protected conservatively.
+     */
+    public ReloadReport reload(Set<String> nonEnemySectorIds) {
         List<String> warnings = new ArrayList<>();
         YamlConfiguration nextConfig = load("config.yml", warnings);
         YamlConfiguration nextMessages = load("messages.yml", warnings);
@@ -57,7 +63,7 @@ public final class ConfigManager {
         validateMobs(nextMobs, warnings);
         List<String> restart = new ArrayList<>();
         preserveRestartValues(config, nextConfig, restart);
-        preserveSectorRestartValues(sectors, nextSectors, restart);
+        preserveSectorRestartValues(sectors, nextSectors, restart, nonEnemySectorIds);
         config = nextConfig; messages = nextMessages; sectors = nextSectors;
         mobs = nextMobs; blueprints = nextBlueprints; menus = nextMenus;
         logWarnings(warnings);
@@ -97,6 +103,8 @@ public final class ConfigManager {
     private void validateConfig(YamlConfiguration y, List<String> w) {
         validateInt(y,"database.port",1,65535,3306,w); validateInt(y,"database.pool_size",1,64,6,w);
         validateInt(y,"kpm.update_interval_seconds",1,60,1,w); validateInt(y,"kpm.window_seconds",1,3600,60,w);
+        validateInt(y,"kpm.player_idle_cleanup_seconds",1,86400,120,w);
+        validateInt(y,"state_persist_interval_seconds",1,3600,10,w);
         validateInt(y,"spawn.max_alive_clusters_per_sector",1,100,3,w); validateInt(y,"spawn.max_alive_clusters_total",1,200,6,w);
         validateInt(y,"spawn.despawn_spread_ticks",5,10,8,w); validateInt(y,"transform.scan_threads",1,32,2,w);
         validateInt(y,"stronghold.max_blocks_per_tick",1,100000,2000,w); validateInt(y,"placeholders.kpm_decimals",0,3,1,w);
@@ -240,20 +248,53 @@ public final class ConfigManager {
         }
     }
 
-    private void preserveSectorRestartValues(YamlConfiguration old,YamlConfiguration next,List<String>changed){
-        if(old==null)return;
-        ConfigurationSection oldRoot=old.getConfigurationSection("sectors"),newRoot=next.getConfigurationSection("sectors");
-        Set<String>ids=new TreeSet<>();
-        if(oldRoot!=null)ids.addAll(oldRoot.getKeys(false));if(newRoot!=null)ids.addAll(newRoot.getKeys(false));
-        for(String id:ids){
-            ConfigurationSection before=oldRoot==null?null:oldRoot.getConfigurationSection(id);
-            ConfigurationSection after=newRoot==null?null:newRoot.getConfigurationSection(id);
-            String base="sectors."+id;
-            if(before==null&&after!=null){next.set(base,null);changed.add(base);continue;}
-            if(before!=null&&after==null){next.set(base,before.getValues(true));changed.add(base);continue;}
-            for(String field:List.of("world","coords","replaces","stronghold.blueprint","stronghold.center","stronghold.npc","stronghold.npc_coord")){
-                String path=base+"."+field;
-                if(!Objects.equals(old.get(path),next.get(path))){next.set(path,old.get(path));changed.add(path);}
+    private void preserveSectorRestartValues(YamlConfiguration old, YamlConfiguration next,
+                                             List<String> changed, Set<String> nonEnemySectorIds) {
+        if (old == null) return;
+        ConfigurationSection oldRoot = old.getConfigurationSection("sectors");
+        ConfigurationSection newRoot = next.getConfigurationSection("sectors");
+        Set<String> ids = new TreeSet<>();
+        if (oldRoot != null) ids.addAll(oldRoot.getKeys(false));
+        if (newRoot != null) ids.addAll(newRoot.getKeys(false));
+
+        Set<String> protectedIds = nonEnemySectorIds == null
+                ? null
+                : nonEnemySectorIds.stream().map(id -> id.toLowerCase(Locale.ROOT))
+                        .collect(java.util.stream.Collectors.toSet());
+
+        for (String id : ids) {
+            String normalizedId = id.toLowerCase(Locale.ROOT);
+            boolean protect = protectedIds == null || protectedIds.contains(normalizedId);
+            ConfigurationSection before = oldRoot == null ? null : oldRoot.getConfigurationSection(id);
+            ConfigurationSection after = newRoot == null ? null : newRoot.getConfigurationSection(id);
+            String base = "sectors." + id;
+
+            // New sectors are added immediately; their initial state is ENEMY.
+            if (before == null) continue;
+
+            // A non-ENEMY sector cannot be removed while it may own transformed world state.
+            if (after == null) {
+                if (protect) {
+                    next.set(base, before.getValues(true));
+                    changed.add(base);
+                }
+                continue;
+            }
+
+            // Only non-ENEMY sectors retain active geometry/stronghold restart keys.
+            if (!protect) continue;
+            for (String field : List.of("world", "coords", "replaces",
+                    "stronghold.blueprint", "stronghold.center", "stronghold.npc",
+                    "stronghold.npc_coord")) {
+                String path = base + "." + field;
+                Object previousValue = YamlValueSnapshots.snapshot(old.get(path));
+                Object nextValue = YamlValueSnapshots.snapshot(next.get(path));
+                if (!Objects.equals(previousValue, nextValue)) {
+                    // Store a detached plain map for YAML sections; never attach a
+                    // ConfigurationSection owned by the previous configuration.
+                    next.set(path, previousValue);
+                    changed.add(path);
+                }
             }
         }
     }

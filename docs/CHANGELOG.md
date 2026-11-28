@@ -1,20 +1,23 @@
 # Changelog
 
-## [0.1.0] — 2026-11-26
+## [0.2.0-stage2] — 2026-11-27
 
 ### Добавлено
-- Инициализирован Maven multi-module проект: parent, API и plugin.
-- Добавлены обязательные отчётные файлы и полная копия docs/PLAN.txt.
-- Добавлен GitHub Actions CI для JDK 21 и Maven verify.
-- Добавлены API DTO/события, базовые интерфейсы сервисов, YAML-шаблоны, ConfigManager, сообщения, DB bootstrap, versioned migration и text editor sectors.yml.
-- Добавлены HikariCP, асинхронный JdbcStateStore, bounded write-behind и последовательное сохранение обновлений сектора с exponential retry при временной потере MySQL.
-- Добавлены JUnit 5 тесты YamlTextEditor.
+- Геометрия XZ без Bukkit: проверка осевых контуров, растеризация scanline с включённой границей, линии, вогнутые фигуры, интервалы строк и объединение в прямоугольники.
+- Primitive-long ChunkIndex с четырьмя long-масками на чанк, O(1) `sectorAt`, `sectorsNear`, площадь и дистанция до сектора.
+- Загрузчик `sectors.yml`, независимая валидация секторов и spawn anchors, immutable SectorRegistry, SurfaceResolver без принудительной загрузки чанков.
+- Скользящие окна KPM в десятых долях, персональные окна, immutable snapshots, idle cleanup и безопасное изменение размера окна.
+- Чистый Java автомат ENEMY/SAFE/HELD/DESTRUCTION с остатками таймеров, startup grace, freeze_when_empty, infinite_safe, occupation, anti-flap и resume window.
+- Bukkit events и batch сообщения о начале разрушения/потере нескольких секторов.
+- Миграция v2: `spawn_pause_left_s` и таблица `if_sector_override`; загрузка и сохранение состояния сектора/override.
+- Независимый от частоты KPM-тиков периодический persist; финальная запись состояния ожидается до закрытия MySQL при выключении.
+- Debug-команды `/if debug kill`, `/if debug state` и персистентные overrides `/if sectors set`.
+- JUnit 5 тесты геометрии, KPM и автомата состояний.
 
 ### Проверка
-- GitHub Actions feature run #8 для коммита 39b956b завершился успешно: `mvn -B verify`, включая JUnit 5.
-- GitHub Actions main run #7 для коммита a2e86ca завершился успешно: Maven baseline собирается.
-- Live-запуск на Purpur 1.20.6 и реальная MySQL-проверка не выполнены в этой среде.
+- GitHub Actions run #36: `mvn -B verify` — success.
+- Ручная приёмка Stage 2 на Purpur 1.20.6 и Spark-профилирование ещё не выполнены.
 
-### Известные ограничения
-- Runtime-интеграция PrivateMobsX ожидает согласования API из раздела 18.1.
-- Лицензия репозитория ожидает решения владельца.
+### Границы этапа
+- `MobSpawn` остаётся заглушкой; настоящие кластеры, FormationCalculator, SpawnDirector и интеграция PrivateMobsX API будут на этапе 3B.
+- Административные команды выделения/просмотра/удаления и трансформация мира остаются на этапах 3A/3C.

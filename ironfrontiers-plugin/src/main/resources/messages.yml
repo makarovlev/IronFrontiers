@@ -101,3 +101,13 @@ config:
     invalid_range: "Значение вне допустимого диапазона"
     invalid_id: "Неверный идентификатор"
     disabled_entry: "Элемент отключён из-за ошибок конфигурации"
+
+debug:
+  disabled: "<red>Отладочная система выключена (debug: false)."
+  usage_kill: "<yellow>Использование: /if debug kill <sector> <n> [weight]"
+  usage_state: "<yellow>Использование: /if debug state <sector> <state>"
+  invalid_count: "<red>Количество убийств должно быть от 1 до 10000."
+  invalid_weight: "<red>Вес должен быть положительным числом с точностью до 0.1."
+  invalid_state: "<red>Состояние должно быть ENEMY, SAFE, HELD или DESTRUCTION."
+  kill_added: "<green>Добавлено {count} убийств для сектора {sector}; вес {weight}."
+  state_set: "<green>Состояние сектора {sector} установлено в {state}."

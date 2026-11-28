@@ -1,6 +1,7 @@
 package com.gachicraft.ironfrontiers.storage;
 
 import com.gachicraft.ironfrontiers.storage.migration.Migration_1;
+import com.gachicraft.ironfrontiers.storage.migration.Migration_2;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -28,7 +29,9 @@ public final class DatabaseBootstrapper {
                 int port = config.getInt("database.port", 3306);
                 String name = config.getString("database.name", "ironfrontiers");
                 String prefix = config.getString("database.table_prefix", "if_");
-                if (!prefix.matches("[A-Za-z0-9_]{1,24}")) throw new IllegalArgumentException("Invalid database.table_prefix");
+                if (!prefix.matches("[A-Za-z0-9_]{1,24}")) {
+                    throw new IllegalArgumentException("Invalid database.table_prefix");
+                }
                 boolean ssl = config.getBoolean("database.use_ssl", false);
                 String jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + name
                         + "?useSSL=" + ssl + "&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8";
@@ -43,7 +46,8 @@ public final class DatabaseBootstrapper {
                 hikari.setPoolName("IronFrontiers-MySQL");
                 pool = new HikariDataSource(hikari);
 
-                int schemaVersion = new SchemaMigrator(List.of(new Migration_1())).migrate(pool, prefix);
+                int schemaVersion = new SchemaMigrator(List.of(new Migration_1(), new Migration_2()))
+                        .migrate(pool, prefix);
                 plugin.getLogger().info("Database schema version " + schemaVersion + " is ready");
                 JdbcStateStore store = new JdbcStateStore(pool, databaseExecutor, prefix);
                 return new DatabaseHandle(pool, store);
