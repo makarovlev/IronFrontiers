@@ -84,6 +84,7 @@ selection:
   point_added: "<green>Вершина {n}: X={x}, Z={z}."
   point_removed: "<yellow>Последняя вершина удалена."
   err_world: "<red>Нельзя выделять сектор в другом мире."
+  err_not_war_world: "<red>Создавать сектора можно только в мирах из config.war_worlds."
   err_axis: "<red>Следующая вершина должна лежать на X={px} или Z={pz}."
   err_close_axis: "<red>Последняя точка должна иметь X={x} или Z={z}."
   err_overlap_edge: "<red>Новое ребро пересекает или касается несмежного ребра."
