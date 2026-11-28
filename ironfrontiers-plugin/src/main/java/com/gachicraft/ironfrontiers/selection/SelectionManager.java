@@ -569,9 +569,13 @@ public final class SelectionManager implements Listener, AutoCloseable {
         World world = Bukkit.getWorld(sector.worldId());
         if (world == null || !player.getWorld().getUID().equals(world.getUID())) return;
         List<GridPoint> vertices = sector.vertices();
-        for (int i = 0; i < vertices.size() && budget[0] > 0; i++) {
+        boolean linear = vertices.size() > 1 && (vertices.stream()
+                .allMatch(point -> point.x() == vertices.getFirst().x())
+                || vertices.stream().allMatch(point -> point.z() == vertices.getFirst().z()));
+        int edgeCount = linear ? vertices.size() - 1 : vertices.size();
+        for (int i = 0; i < edgeCount && budget[0] > 0; i++) {
             GridPoint first = vertices.get(i);
-            GridPoint second = vertices.get((i + 1) % vertices.size());
+            GridPoint second = linear ? vertices.get(i + 1) : vertices.get((i + 1) % vertices.size());
             renderEdge(player, world, first, second, world.getMaxHeight() - 1,
                     world.getMaxHeight() - 1, false, false, budget);
         }
@@ -588,28 +592,68 @@ public final class SelectionManager implements Listener, AutoCloseable {
     private void renderEdge(Player player, World world, GridPoint first, GridPoint second,
                             int firstY, int secondY, boolean highlightStart,
                             boolean highlightEnd, int[] budget) {
+        if (budget[0] <= 0) return;
+
         int dx = Integer.compare(second.x(), first.x());
         int dz = Integer.compare(second.z(), first.z());
         int length = Math.abs(second.x() - first.x()) + Math.abs(second.z() - first.z());
+        int startStep = 0;
+        int endStep = length;
+        double radius = Math.max(1.0,
+                configs.config().getInt("selection.particle_view_radius", 48));
+        Location playerLocation = player.getLocation();
+
+        // Restrict iteration to the edge segment intersecting the viewer's radius.
+        // This keeps long boundaries cheap even when most of the edge is far away.
+        if (dx != 0) {
+            double fixedZ = first.z() + 0.5;
+            double distanceZ = Math.abs(playerLocation.getZ() - fixedZ);
+            if (distanceZ > radius) return;
+            double radiusX = Math.sqrt(Math.max(0.0, radius * radius - distanceZ * distanceZ));
+            int minX = (int) Math.ceil(playerLocation.getX() - radiusX - 0.5);
+            int maxX = (int) Math.floor(playerLocation.getX() + radiusX - 0.5);
+            if (dx > 0) {
+                startStep = Math.max(0, minX - first.x());
+                endStep = Math.min(length, maxX - first.x());
+            } else {
+                startStep = Math.max(0, first.x() - maxX);
+                endStep = Math.min(length, first.x() - minX);
+            }
+        } else if (dz != 0) {
+            double fixedX = first.x() + 0.5;
+            double distanceX = Math.abs(playerLocation.getX() - fixedX);
+            if (distanceX > radius) return;
+            double radiusZ = Math.sqrt(Math.max(0.0, radius * radius - distanceX * distanceX));
+            int minZ = (int) Math.ceil(playerLocation.getZ() - radiusZ - 0.5);
+            int maxZ = (int) Math.floor(playerLocation.getZ() + radiusZ - 0.5);
+            if (dz > 0) {
+                startStep = Math.max(0, minZ - first.z());
+                endStep = Math.min(length, maxZ - first.z());
+            } else {
+                startStep = Math.max(0, first.z() - maxZ);
+                endStep = Math.min(length, first.z() - minZ);
+            }
+        }
+        if (startStep > endStep) return;
+
         double previousTop = Double.NaN;
-        int previousX = first.x();
-        int previousZ = first.z();
-        for (int step = 0; step <= length && budget[0] > 0; step++) {
+        int previousX = first.x() + dx * startStep;
+        int previousZ = first.z() + dz * startStep;
+        for (int step = startStep; step <= endStep && budget[0] > 0; step++) {
             int x = first.x() + dx * step;
             int z = first.z() + dz * step;
-            if (distanceSquared(player, x + 0.5, z + 0.5)
-                    > Math.pow(configs.config().getInt("selection.particle_view_radius", 48), 2)) {
-                previousTop = Double.NaN;
-                continue;
-            }
             OptionalDouble top = SurfaceResolver.top(world, x, z,
                     step == 0 ? firstY : step == length ? secondY : (firstY + secondY) / 2);
             budget[0]--;
             if (top.isEmpty()) {
                 previousTop = Double.NaN;
+                previousX = x;
+                previousZ = z;
                 continue;
             }
-            double y = top.getAsDouble() + configs.config().getDouble("selection.ribbon_height_offset", 0.1);
+
+            double y = top.getAsDouble()
+                    + configs.config().getDouble("selection.ribbon_height_offset", 0.1);
             Color color = step == 0 && highlightStart ? Color.LIME
                     : step == length && highlightEnd ? Color.RED : Color.fromRGB(255, 190, 40);
             drawColumn(player, x + 0.5, z + 0.5, y, color);
