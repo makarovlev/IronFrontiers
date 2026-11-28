@@ -5,12 +5,12 @@ import com.gachicraft.ironfrontiers.sector.SectorDefinition;
 import com.gachicraft.ironfrontiers.sector.SectorRegistry;
 import com.gachicraft.ironfrontiers.sector.SectorRuntimeController;
 import com.gachicraft.ironfrontiers.sector.SectorRuntimeState;
+import com.gachicraft.ironfrontiers.sector.SpawnAnchor;
 import com.gachicraft.ironfrontiers.util.CentralTimerScheduler;
 import com.gachicraft.privatemobsx.api.DespawnReason;
 import com.gachicraft.privatemobsx.api.event.PrivateMobDeathEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.EntityType;
@@ -24,9 +24,7 @@ import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 
 /**
  * Main-thread spawn session coordinator. All Bukkit and PrivateMobsX calls are
@@ -260,7 +258,7 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
             for (int i = 0; i < entry.amount(); i++) expanded.add(entry);
         }
         Collections.shuffle(expanded, random);
-        double spacing = Math.max(1.5, configs.config().getDouble("spawn.formation.spacing", 2.5));
+        double spacing = Math.max(0, configs.config().getDouble("spawn.formation.spacing", 2.5));
         double jitter = Math.max(0, configs.config().getDouble("spawn.formation.jitter", 0.3));
         boolean rotate = configs.config().getBoolean("spawn.formation.random_rotation", true);
         double widest = expanded.stream().mapToDouble(this::estimatedMobWidth).max().orElse(0.6);
