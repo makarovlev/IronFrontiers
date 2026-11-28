@@ -87,14 +87,10 @@ final class SectorMessageBatcher implements AutoCloseable {
 
     private void send(String key, Map<String, String> placeholders) {
         Messages messages = new Messages(configs.messages());
-        Set<String> warWorlds = new HashSet<>();
-        for (String world : configs.config().getStringList("war_worlds")) {
-            warWorlds.add(world.toLowerCase(Locale.ROOT));
-        }
+        // Sector state affects the whole game server; notify every online player,
+        // including players in lobby, tutorial, and other non-war worlds.
         for (Player player : server.getOnlinePlayers()) {
-            if (warWorlds.contains(player.getWorld().getName().toLowerCase(Locale.ROOT))) {
-                messages.send(player, key, placeholders);
-            }
+            messages.send(player, key, placeholders);
         }
     }
 
