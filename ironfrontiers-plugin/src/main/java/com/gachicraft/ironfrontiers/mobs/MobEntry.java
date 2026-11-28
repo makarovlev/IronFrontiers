@@ -19,7 +19,7 @@ public record MobEntry(
         if (entryId == null || entryId.isBlank()
                 || mobId == null || mobId.isBlank()
                 || amount < 1 || amount > 10
-                || weightTenths < 0 || weightTenths > 1000) {
+                || weightTenths < 0) {
             throw new IllegalArgumentException("Invalid mob cluster entry");
         }
         Objects.requireNonNull(type, "type");
