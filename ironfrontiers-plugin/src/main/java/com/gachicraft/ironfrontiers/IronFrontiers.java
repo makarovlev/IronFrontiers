@@ -3,12 +3,14 @@ package com.gachicraft.ironfrontiers;
 import com.gachicraft.ironfrontiers.bootstrap.ExecutorPools;
 import com.gachicraft.ironfrontiers.bootstrap.ServiceRegistry;
 import com.gachicraft.ironfrontiers.command.CommandRegistrar;
+import com.gachicraft.ironfrontiers.command.ConfirmationManager;
 import com.gachicraft.ironfrontiers.config.ConfigManager;
 import com.gachicraft.ironfrontiers.integration.IntegrationRegistry;
 import com.gachicraft.ironfrontiers.sector.*;
 import com.gachicraft.ironfrontiers.storage.*;
 import com.gachicraft.ironfrontiers.util.CentralTimerScheduler;
 import com.gachicraft.ironfrontiers.mobs.NoopMobSpawn;
+import com.gachicraft.ironfrontiers.selection.SelectionManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
@@ -25,6 +27,8 @@ public final class IronFrontiers extends JavaPlugin {
     private CentralTimerScheduler timers;
     private DatabaseHandle database;
     private SectorRuntimeController sectorController;
+    private SelectionManager selectionManager;
+    private ConfirmationManager confirmationManager;
     private boolean databaseReady;
     private boolean databaseInitializationInProgress;
     private boolean initialDatabaseAttempt = true;
@@ -48,6 +52,11 @@ public final class IronFrontiers extends JavaPlugin {
             timers.start();
             services.register(CentralTimerScheduler.class, timers);
 
+            selectionManager = new SelectionManager(this, configs, timers, () -> sectorController);
+            confirmationManager = new ConfirmationManager(this, configs, timers);
+            getServer().getPluginManager().registerEvents(selectionManager, this);
+            getServer().getPluginManager().registerEvents(confirmationManager, this);
+
             Authority authority = new AlwaysLeader();
             PlayerCountSource playerCount = new LocalPlayerCountSource(getServer());
             StateBroadcaster broadcaster = new NoopBroadcaster();
@@ -65,7 +74,8 @@ public final class IronFrontiers extends JavaPlugin {
 
             // Register early so /if reload and the database-unavailable message work
             // even when MySQL is not reachable during startup.
-            CommandRegistrar.register(this, configs, () -> sectorController, () -> databaseReady);
+            CommandRegistrar.register(this, configs, () -> sectorController, () -> databaseReady,
+                    selectionManager, confirmationManager);
             startDatabaseInitialization();
             getLogger().info("Iron Frontiers bootstrap started (Java " + Runtime.version().feature() + ")");
         } catch (Exception exception) {
@@ -188,6 +198,8 @@ public final class IronFrontiers extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (selectionManager != null) selectionManager.close();
+        if (confirmationManager != null) confirmationManager.close();
         CompletableFuture<Void> finalFlush = null;
         if (sectorController != null) {
             sectorController.close();
