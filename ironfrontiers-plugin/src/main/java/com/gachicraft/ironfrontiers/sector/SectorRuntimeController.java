@@ -195,7 +195,8 @@ public final class SectorRuntimeController implements AutoCloseable {
             }
         }
         registry = nextRegistry;
-        long nowSecond = (System.nanoTime() - monotonicStartNanos) / 1_000_000_000L;
+        mobSpawn.reloadConfiguration();
+        long nowSecond = currentMonotonicSecond();
         kpmTracker.tick(nowSecond);
         if (previousUpdateInterval != nextUpdateInterval) {
             scheduleNextTick();
@@ -226,7 +227,7 @@ public final class SectorRuntimeController implements AutoCloseable {
         if (closed || !started) return;
 
         int dt = updateIntervalSeconds;
-        long nowSecond = (System.nanoTime() - monotonicStartNanos) / 1_000_000_000L;
+        long nowSecond = currentMonotonicSecond();
         kpmTracker.tick(nowSecond);
 
         boolean startupFrozen = startupGraceLeftSeconds > 0;
@@ -617,3 +618,8 @@ public final class SectorRuntimeController implements AutoCloseable {
     }
 
 }
+
+    /** Monotonic seconds from the same clock used by KPM windows. */
+    public long currentMonotonicSecond() {
+        return Math.max(0L, (System.nanoTime() - monotonicStartNanos) / 1_000_000_000L);
+    }
