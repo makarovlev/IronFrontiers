@@ -556,8 +556,8 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
             if (!session.starved || session.despawning
                     || !session.sector.worldId().equals(event.getWorld().getUID())) continue;
             boolean containsAnchor = session.slots.values().stream().anyMatch(slot ->
-                    (slot.anchor.x() >> 4) == event.getChunk().getX()
-                            && (slot.anchor.z() >> 4) == event.getChunk().getZ());
+                    (((int) Math.floor(slot.anchor.x())) >> 4) == event.getChunk().getX()
+                            && (((int) Math.floor(slot.anchor.z())) >> 4) == event.getChunk().getZ());
             if (containsAnchor) tryWakeStarvedSession(session);
         }
     }
