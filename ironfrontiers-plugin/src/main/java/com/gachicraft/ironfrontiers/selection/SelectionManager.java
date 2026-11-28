@@ -99,8 +99,9 @@ public final class SelectionManager implements Listener, AutoCloseable {
             return false;
         }
 
-        Session previous = sessions.remove(player.getUniqueId());
-        if (previous != null) removeTool(player, previous.sectorId);
+        sessions.remove(player.getUniqueId());
+        // Remove inactive tools left after a quit/world change before issuing the new session tool.
+        removeAllTools(player);
         sessions.put(player.getUniqueId(), new Session(sectorId, player.getWorld().getUID(),
                 worldName, System.nanoTime()));
         giveTool(player, sectorId);
@@ -474,6 +475,14 @@ public final class SelectionManager implements Listener, AutoCloseable {
         tool.setItemMeta(meta);
         Map<Integer, ItemStack> overflow = player.getInventory().addItem(tool);
         overflow.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+    }
+
+    private void removeAllTools(Player player) {
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int i = 0; i < contents.length; i++) {
+            if (toolSector(contents[i]) != null) contents[i] = null;
+        }
+        player.getInventory().setContents(contents);
     }
 
     private void removeTool(Player player, String sectorId) {
