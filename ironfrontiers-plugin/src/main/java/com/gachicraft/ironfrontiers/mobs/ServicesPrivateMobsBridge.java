@@ -99,6 +99,12 @@ public final class ServicesPrivateMobsBridge implements PrivateMobsBridge {
         return api == null ? 0 : api.despawnByTag(owner, key, value, reason(reason), maxPerCall);
     }
 
+    public int despawnByTag(UUID owner, String key, String value, String reason) {
+        requirePrimaryThread();
+        PrivateMobsApi api = api();
+        return api == null ? 0 : api.despawnByTag(owner, key, value, reason(reason));
+    }
+
     public Collection<PrivateMobHandle> getHandles(UUID owner, String key, String value) {
         requirePrimaryThread();
         PrivateMobsApi api = api();
