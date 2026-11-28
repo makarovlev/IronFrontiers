@@ -10,6 +10,7 @@
   <name>Iron Frontiers Parent</name>
   <modules>
     <module>ironfrontiers-api</module>
+    <module>privatemobsx-api</module>
     <module>ironfrontiers-plugin</module>
   </modules>
   <properties>
