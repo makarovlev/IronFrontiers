@@ -123,6 +123,35 @@ public final class JdbcStateStore implements StateStore {
         }, executor);
     }
 
+    @Override
+    public CompletableFuture<Void> deleteSector(String sectorId) {
+        return CompletableFuture.runAsync(() -> {
+            try (Connection connection = dataSource.getConnection()) {
+                boolean previousAutoCommit = connection.getAutoCommit();
+                connection.setAutoCommit(false);
+                try {
+                    try (PreparedStatement stateDelete = connection.prepareStatement(
+                            "DELETE FROM " + stateTable + " WHERE sector_id=?");
+                         PreparedStatement overrideDelete = connection.prepareStatement(
+                            "DELETE FROM " + overrideTable + " WHERE sector_id=?")) {
+                        stateDelete.setString(1, sectorId);
+                        stateDelete.executeUpdate();
+                        overrideDelete.setString(1, sectorId);
+                        overrideDelete.executeUpdate();
+                    }
+                    connection.commit();
+                } catch (Exception exception) {
+                    connection.rollback();
+                    throw exception;
+                } finally {
+                    connection.setAutoCommit(previousAutoCommit);
+                }
+            } catch (Exception exception) {
+                throw new IllegalStateException("Could not delete sector data " + sectorId, exception);
+            }
+        }, executor);
+    }
+
     private static Long nullableLong(ResultSet result, String column) throws Exception {
         long value = result.getLong(column);
         return result.wasNull() ? null : value;
