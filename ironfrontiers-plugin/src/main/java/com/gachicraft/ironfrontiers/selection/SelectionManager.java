@@ -24,6 +24,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -169,6 +170,13 @@ public final class SelectionManager implements Listener, AutoCloseable {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onBlockPlace(BlockPlaceEvent event) {
+        if (toolSector(event.getItemInHand()) != null) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
@@ -261,10 +269,11 @@ public final class SelectionManager implements Listener, AutoCloseable {
         } catch (IllegalArgumentException exception) {
             String message = exception.getMessage() == null ? "" : exception.getMessage();
             if (message.contains("180")) send(player, "selection.err_reverse", Map.of());
-            else if (message.contains("axis") || message.contains("aligned")) {
+            else if (message.contains("axis") || message.contains("aligned")
+                    || message.contains("horizontal") || message.contains("vertical")) {
                 GridPoint first = vertices.getFirst();
                 send(player, "selection.err_close_axis", Map.of(
-                        "x0", Integer.toString(first.x()), "z0", Integer.toString(first.z())));
+                        "x", Integer.toString(first.x()), "z", Integer.toString(first.z())));
             } else send(player, "selection.err_overlap_edge", Map.of());
             return;
         }
