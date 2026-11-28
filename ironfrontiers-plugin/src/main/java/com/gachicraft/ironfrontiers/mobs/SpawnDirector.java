@@ -192,6 +192,10 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
             Player player = Bukkit.getPlayer(session.key.owner);
             if (player == null || !player.getWorld().getUID().equals(session.sector.worldId())) continue;
             if (nearestAnchorDistance(player.getLocation(), session.sector) > despawnDistance) continue;
+            if (session.pendingChain && !hasWaitingSlot(session)) {
+                queueChainWait(session, null, session.pendingChainDelaySeconds);
+                if (!session.pendingChain) continue;
+            }
             SlotSession next = nearestEligibleSlot(session, player, null);
             if (next != null && spawnSlot(session, next, player)) {
                 session.starved = false;
@@ -476,6 +480,10 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
                 || !player.getWorld().getUID().equals(session.sector.worldId())) return;
         if (nearestAnchorDistance(player.getLocation(), session.sector)
                 > Math.max(1, configs.config().getInt("spawn.despawn_distance", 200))) return;
+        if (session.pendingChain && !hasWaitingSlot(session)) {
+            queueChainWait(session, null, session.pendingChainDelaySeconds);
+            if (!session.pendingChain) return;
+        }
         SlotSession next = nearestEligibleSlot(session, player, null);
         if (next != null && spawnSlot(session, next, player)) session.starved = false;
     }
