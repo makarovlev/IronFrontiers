@@ -204,7 +204,10 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
                             "capture", formatTenths(policy.captureTenths()),
                             "held", formatTenths(policy.effectiveHeldTenths()),
                             "players", Integer.toString(playersInside(controller, sector)),
-                            "stronghold", messages.raw("sector.stronghold.not_built"));
+                            "stronghold", configs.sectors().isConfigurationSection(
+                                    "sectors." + sector.id() + ".stronghold")
+                                    ? messages.raw("sector.stronghold.configured")
+                                    : messages.raw("sector.stronghold.not_configured"));
                     Component line = messages.component("sector.line", placeholders)
                             .clickEvent(ClickEvent.runCommand("/if sectors info " + sector.id()));
                     Component teleport = Component.text(" [tp]")
@@ -337,10 +340,19 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
                 messages.raw("sector.states." + state.state().name().toLowerCase(Locale.ROOT))));
         messages.send(sender, "sector.info.kpm", Map.of(
                 "kpm", formatKpm(controller.kpmTracker().kpm(sector.id()))));
+        var override = controller.override(sector.id()).orElse(null);
         messages.send(sender, "sector.info.capture", Map.of(
                 "kpm_capture", thresholdText(sector.kpmCaptureTenths(), policy.captureTenths())));
+        messages.send(sender, "sector.info.capture_source", Map.of(
+                "source", override != null && override.captureTenths() != null
+                        ? messages.raw("sector.sources.database_override")
+                        : valueSource(messages, sector.id(), "kpm_capture")));
         messages.send(sender, "sector.info.held", Map.of(
                 "kpm_held", thresholdText(sector.kpmHeldTenths(), policy.effectiveHeldTenths())));
+        messages.send(sender, "sector.info.held_source", Map.of(
+                "source", override != null && override.heldTenths() != null
+                        ? messages.raw("sector.sources.database_override")
+                        : valueSource(messages, sector.id(), "kpm_held")));
         messages.send(sender, "sector.info.time", Map.of("time", remainingTime(sector, state)));
         messages.send(sender, "sector.info.area", Map.of("area", Long.toString(sector.area())));
         IntRect bounds = sector.geometry().bounds();
@@ -355,13 +367,41 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
         messages.send(sender, "sector.info.infinite_safe", Map.of(
                 "value", sector.infiniteSafe() ? "да" : "нет"));
         messages.send(sender, "sector.info.safe_time", Map.of(
-                "seconds", Integer.toString(sector.safeTimeSeconds())));
+                "seconds", Integer.toString(sector.safeTimeSeconds()),
+                "source", valueSource(messages, sector.id(), "safe_time")));
         messages.send(sender, "sector.info.destruction_time", Map.of(
-                "seconds", Integer.toString(sector.destructionTimeSeconds())));
+                "seconds", Integer.toString(sector.destructionTimeSeconds()),
+                "source", valueSource(messages, sector.id(), "destruction_time")));
         messages.send(sender, "sector.info.occupation_time", Map.of(
-                "seconds", Integer.toString(sector.occupationTimeSeconds())));
-        messages.send(sender, "sector.info.stronghold", Map.of(
-                "stronghold", messages.raw("sector.stronghold.not_built")));
+                "seconds", Integer.toString(sector.occupationTimeSeconds()),
+                "source", valueSource(messages, sector.id(), "occupation_time")));
+        org.bukkit.configuration.ConfigurationSection stronghold =
+                configs.sectors().getConfigurationSection("sectors." + sector.id() + ".stronghold");
+        if (stronghold == null) {
+            messages.send(sender, "sector.info.stronghold",
+                    Map.of("stronghold", messages.raw("sector.stronghold.not_configured")));
+        } else {
+            messages.send(sender, "sector.info.stronghold",
+                    Map.of("stronghold", messages.raw("sector.stronghold.not_built")));
+            messages.send(sender, "sector.info.stronghold_npc", Map.of(
+                    "npc", Integer.toString(stronghold.getInt("npc", -1))));
+            messages.send(sender, "sector.info.stronghold_npc_coord", Map.of(
+                    "coord", stronghold.getString("npc_coord", "—")));
+            messages.send(sender, "sector.info.stronghold_blueprint", Map.of(
+                    "blueprint", stronghold.getString("blueprint", "—")));
+            messages.send(sender, "sector.info.stronghold_center", Map.of(
+                    "center", stronghold.getString("center", "—")));
+            org.bukkit.configuration.ConfigurationSection requirements =
+                    stronghold.getConfigurationSection("requirements");
+            messages.send(sender, "sector.info.stronghold_requirements", Map.of(
+                    "count", Integer.toString(requirements == null ? 0 : requirements.getKeys(false).size())));
+        }
+    }
+
+    private String valueSource(Messages messages, String sectorId, String field) {
+        return configs.sectors().contains("sectors." + sectorId + "." + field)
+                ? messages.raw("sector.sources.sector")
+                : messages.raw("sector.sources.defaults");
     }
 
     private static String thresholdText(int configuredTenths, int effectiveTenths) {
