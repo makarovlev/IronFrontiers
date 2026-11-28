@@ -1,6 +1,7 @@
 package com.gachicraft.ironfrontiers.mobs;
 
 import com.gachicraft.ironfrontiers.config.ConfigManager;
+import com.gachicraft.ironfrontiers.integration.MythicBridge;
 import com.gachicraft.ironfrontiers.sector.SectorDefinition;
 import com.gachicraft.ironfrontiers.sector.SectorRegistry;
 import com.gachicraft.ironfrontiers.sector.SectorRuntimeController;
@@ -88,7 +89,8 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
     @Override
     public void reloadConfiguration() {
         requirePrimaryThread();
-        clusters = new MobClusterLoader(plugin.getLogger()).load(configs.mobs());
+        MythicBridge mythic = new MythicBridge(plugin.getServer().getPluginManager());
+        clusters = new MobClusterLoader(plugin.getLogger(), mythic::validateMobId).load(configs.mobs());
         triggerIntervalTicks = clamp(configs.config().getInt("spawn.check_interval_ticks", 10), 1, 200);
         despawnIntervalTicks = clamp(configs.config().getInt("spawn.despawn_check_interval_ticks", 20), 1, 1200);
         despawnSpreadTicks = clamp(configs.config().getInt("spawn.despawn_spread_ticks", 8), 5, 10);
