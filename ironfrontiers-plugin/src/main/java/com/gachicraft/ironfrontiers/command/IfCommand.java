@@ -425,6 +425,8 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
         try {
             oldText = Files.readString(file, StandardCharsets.UTF_8);
             updatedText = YamlTextEditor.removeSectorBlock(oldText, sectorId);
+            // Commit the config edit first. A disk error must never delete live DB state.
+            writeAtomically(file, updatedText);
         } catch (Exception exception) {
             plugin.getLogger().warning("Could not prepare deletion of sector " + sectorId
                     + ": " + exception.getMessage());
@@ -432,33 +434,35 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        // DB/runtime deletion happens first. If it fails, YAML remains untouched.
+        // The controller marks the id as deleting immediately and then serializes DB deletion
+        // after any pending state writes. Until it completes, the in-memory registry stays intact.
         controller.deleteSector(sectorId).whenComplete((ignored, error) -> runOnMain(() -> {
             if (error != null) {
                 plugin.getLogger().warning("Could not delete sector " + sectorId + ": " + error.getMessage());
-                new Messages(configs.messages()).send(player, "sector.delete_failed",
-                        Map.of("sector", sectorId));
-                return;
-            }
-            try {
-                writeAtomically(file, updatedText);
-                configs.reload(controller.nonEnemySectorIds());
-                controller.reloadDefinitions();
-                new Messages(configs.messages()).send(player, "sector.delete_done",
-                        Map.of("sector", sectorId));
-            } catch (Exception exception) {
-                plugin.getLogger().warning("Could not update sectors.yml after deleting " + sectorId
-                        + ": " + exception.getMessage());
-                // Reload the still-existing YAML entry as a fresh ENEMY runtime row.
                 try {
                     writeAtomically(file, oldText);
                     configs.reload(controller.nonEnemySectorIds());
                     controller.reloadDefinitions();
                 } catch (Exception rollbackError) {
-                    plugin.getLogger().severe("Could not recover sector YAML after deletion failure: "
-                            + rollbackError.getMessage());
+                    plugin.getLogger().severe("Could not restore sectors.yml after failed deletion of "
+                            + sectorId + ": " + rollbackError.getMessage());
                 }
                 new Messages(configs.messages()).send(player, "sector.delete_failed",
+                        Map.of("sector", sectorId));
+                return;
+            }
+
+            try {
+                configs.reload(controller.nonEnemySectorIds());
+                controller.reloadDefinitions();
+            } catch (Exception exception) {
+                // YAML and MySQL are already committed. The runtime entry has been removed;
+                // a normal /if reload or restart will re-read the committed file.
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Sector " + sectorId + " was deleted from YAML/MySQL, but config refresh failed", exception);
+            }
+            if (player.isOnline()) {
+                new Messages(configs.messages()).send(player, "sector.delete_done",
                         Map.of("sector", sectorId));
             }
         }));
