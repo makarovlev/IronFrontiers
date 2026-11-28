@@ -49,6 +49,7 @@ public final class MobClusterLoader {
                     }
 
                     String mobId = required(entry, "mob");
+                    if (!entry.isInt("amount")) throw invalid(id, entryId, "amount must be an integer");
                     int amount = entry.getInt("amount", -1);
                     if (amount < 1 || amount > 10) throw invalid(id, entryId, "amount must be 1..10");
                     total += amount;
