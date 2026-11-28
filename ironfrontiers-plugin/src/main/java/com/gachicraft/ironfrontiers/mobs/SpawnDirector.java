@@ -9,6 +9,7 @@ import com.gachicraft.ironfrontiers.sector.SpawnAnchor;
 import com.gachicraft.ironfrontiers.util.CentralTimerScheduler;
 import com.gachicraft.privatemobsx.api.DespawnReason;
 import com.gachicraft.privatemobsx.api.event.PrivateMobDeathEvent;
+import com.gachicraft.privatemobsx.api.event.PrivateMobDespawnEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -70,6 +71,7 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
         requirePrimaryThread();
         if (closed) throw new IllegalStateException("SpawnDirector is closed");
         if (started) return;
+        reloadConfiguration();
         if (!mobs.isAvailable()) {
             plugin.getLogger().severe("PrivateMobsX public API service is unavailable; mob spawning is disabled");
             return;
@@ -504,6 +506,27 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
 
         handleFirstKill(session, slot);
         if (slot.mobs.isEmpty()) completeSlot(session, slot);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPrivateMobDespawn(PrivateMobDespawnEvent event) {
+        if (closed || !started || event.getReason() == DespawnReason.DEATH) return;
+        Map<String, String> tags = event.getHandle().getTags();
+        String sectorId = tags.get("if_sector");
+        String slotId = tags.get("if_slot");
+        if (sectorId == null || slotId == null) return;
+
+        PlayerSession session = sessions.get(new SessionKey(
+                event.getHandle().getOwner(), normalize(sectorId)));
+        if (session == null || session.despawning) return;
+        SlotSession slot = session.slots.get(slotId);
+        if (slot == null) return;
+        slot.mobs.remove(event.getHandle().getMobId());
+        if (slot.state == SlotState.ACTIVE && slot.mobs.isEmpty()) {
+            // Non-death removals must not count KPM or start the kill chain.
+            slot.state = SlotState.IDLE;
+            slot.retryAfterNanos = System.nanoTime() + EMPTY_RETRY_SECONDS * 1_000_000_000L;
+        }
     }
 
     @EventHandler
