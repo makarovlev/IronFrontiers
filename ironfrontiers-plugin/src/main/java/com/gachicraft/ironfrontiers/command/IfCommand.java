@@ -4,7 +4,10 @@ import com.gachicraft.ironfrontiers.api.SectorState;
 import com.gachicraft.ironfrontiers.config.ConfigManager;
 import com.gachicraft.ironfrontiers.config.ReloadReport;
 import com.gachicraft.ironfrontiers.geometry.GridPoint;
+import com.gachicraft.ironfrontiers.geometry.IntRect;
 import com.gachicraft.ironfrontiers.message.Messages;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
 import com.gachicraft.ironfrontiers.sector.SectorDefinition;
 import com.gachicraft.ironfrontiers.sector.SectorRuntimeController;
 import com.gachicraft.ironfrontiers.sector.SectorRuntimeState;
@@ -191,11 +194,21 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
                 messages.send(sender, "sector.list_header");
                 for (SectorDefinition sector : controller.registry().sectors()) {
                     SectorRuntimeState state = controller.state(sector.id()).orElse(null);
-                    if (state == null) continue;
-                    messages.send(sender, "sector.line", Map.of(
-                            "sector", sector.id(),
+                    SectorStatePolicy policy = controller.policy(sector.id());
+                    if (state == null || policy == null) continue;
+                    Map<String, String> placeholders = Map.of(
+                            "sector", sector.id() + " — " + sector.displayName(),
                             "state", state.state().name(),
-                            "kpm", formatKpm(controller.kpmTracker().kpm(sector.id()))));
+                            "kpm", formatKpm(controller.kpmTracker().kpm(sector.id())),
+                            "capture", formatTenths(policy.captureTenths()),
+                            "held", formatTenths(policy.effectiveHeldTenths()),
+                            "players", Integer.toString(playersInside(controller, sector)),
+                            "stronghold", "NOT_BUILT");
+                    Component line = messages.component("sector.line", placeholders)
+                            .clickEvent(ClickEvent.runCommand("/if sectors info " + sector.id()));
+                    Component teleport = Component.text(" [tp]")
+                            .clickEvent(ClickEvent.runCommand("/if sectors tp " + sector.id()));
+                    sender.sendMessage(line.append(teleport));
                 }
             }
             case "info" -> {
@@ -321,12 +334,49 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
         messages.send(sender, "sector.info.kpm", Map.of(
                 "kpm", formatKpm(controller.kpmTracker().kpm(sector.id()))));
         messages.send(sender, "sector.info.capture", Map.of(
-                "kpm_capture", formatTenths(policy.captureTenths())));
+                "kpm_capture", thresholdText(sector.kpmCaptureTenths(), policy.captureTenths())));
         messages.send(sender, "sector.info.held", Map.of(
-                "kpm_held", formatTenths(policy.effectiveHeldTenths())));
+                "kpm_held", thresholdText(sector.kpmHeldTenths(), policy.effectiveHeldTenths())));
         messages.send(sender, "sector.info.time", Map.of("time", remainingTime(sector, state)));
         messages.send(sender, "sector.info.area", Map.of("area", Long.toString(sector.area())));
+        IntRect bounds = sector.geometry().bounds();
+        messages.send(sender, "sector.info.bounds", Map.of("bounds",
+                bounds.minX() + "," + bounds.minZ() + " — " + bounds.maxX() + "," + bounds.maxZ()));
+        messages.send(sender, "sector.info.vertices", Map.of(
+                "vertices", Integer.toString(sector.vertices().size())));
+        messages.send(sender, "sector.info.players", Map.of(
+                "players", Integer.toString(playersInside(controller, sector))));
+        messages.send(sender, "sector.info.anchors", Map.of(
+                "anchors", Integer.toString(sector.spawnAnchors().size())));
+        messages.send(sender, "sector.info.infinite_safe", Map.of(
+                "value", sector.infiniteSafe() ? "да" : "нет"));
+        messages.send(sender, "sector.info.safe_time", Map.of(
+                "seconds", Integer.toString(sector.safeTimeSeconds())));
+        messages.send(sender, "sector.info.destruction_time", Map.of(
+                "seconds", Integer.toString(sector.destructionTimeSeconds())));
+        messages.send(sender, "sector.info.occupation_time", Map.of(
+                "seconds", Integer.toString(sector.occupationTimeSeconds())));
         messages.send(sender, "sector.info.stronghold", Map.of("stronghold", "NOT_BUILT"));
+    }
+
+    private static String thresholdText(int configuredTenths, int effectiveTenths) {
+        String configured = formatTenths(configuredTenths);
+        String effective = formatTenths(effectiveTenths);
+        return configuredTenths == effectiveTenths
+                ? effective : configured + " → " + effective + " (override/эффект)";
+    }
+
+    private static int playersInside(SectorRuntimeController controller, SectorDefinition sector) {
+        int count = 0;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!player.getWorld().getUID().equals(sector.worldId())) continue;
+            int x = player.getLocation().getBlockX();
+            int z = player.getLocation().getBlockZ();
+            SectorDefinition current = controller.registry()
+                    .sectorAtDefinition(sector.worldId(), x, z).orElse(null);
+            if (current != null && current.id().equalsIgnoreCase(sector.id())) count++;
+        }
+        return count;
     }
 
     private void teleport(Player player, SectorDefinition sector) {
