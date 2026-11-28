@@ -574,12 +574,11 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
         if (session.despawning) return;
         session.despawning = true;
         cancelSessionTimers(session);
-        List<UUID> ids = new ArrayList<>(mobs.getMobIds(session.key.owner, "if_sector", session.sector.id()));
-        if (ids.isEmpty()) {
+        int mobCount = mobs.getMobIds(session.key.owner, "if_sector", session.sector.id()).size();
+        if (mobCount == 0) {
             sessions.remove(session.key);
             return;
         }
-        session.despawnQueue = new ArrayDeque<>(ids);
         session.despawnReason = reason;
         session.despawnTicksLeft = despawnSpreadTicks;
         scheduleDespawnBatch(session);
@@ -589,14 +588,18 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
         String key = session.key.timerPrefix() + ":despawn";
         schedule(key, 1L, () -> {
             if (!session.despawning) return;
-            int remaining = session.despawnQueue.size();
+            int remaining = mobs.getMobIds(session.key.owner, "if_sector", session.sector.id()).size();
+            if (remaining == 0) {
+                sessions.remove(session.key);
+                return;
+            }
             int batchSize = Math.max(1, (int) Math.ceil((double) remaining
                     / Math.max(1, session.despawnTicksLeft)));
-            for (int i = 0; i < batchSize && !session.despawnQueue.isEmpty(); i++) {
-                mobs.despawn(session.key.owner, session.despawnQueue.removeFirst(), session.despawnReason);
-            }
+            mobs.despawnByTag(session.key.owner, "if_sector", session.sector.id(),
+                    session.despawnReason, batchSize);
             session.despawnTicksLeft--;
-            if (session.despawnQueue.isEmpty() || session.despawnTicksLeft <= 0) {
+            if (session.despawnTicksLeft <= 0
+                    || mobs.getMobIds(session.key.owner, "if_sector", session.sector.id()).isEmpty()) {
                 sessions.remove(session.key);
             } else {
                 scheduleDespawnBatch(session);
@@ -692,9 +695,7 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
         for (PlayerSession session : List.copyOf(sessions.values())) {
             cancelSessionTimers(session);
             // Shutdown is a hard boundary; do not leave private mobs for the next boot.
-            for (UUID mobId : mobs.getMobIds(session.key.owner, "if_sector", session.sector.id())) {
-                mobs.despawn(session.key.owner, mobId, "PLUGIN_DISABLE");
-            }
+            mobs.despawnByTag(session.key.owner, "if_sector", session.sector.id(), "PLUGIN_DISABLE");
         }
         sessions.clear();
     }
@@ -731,7 +732,6 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
         private int pendingChainDelaySeconds;
         private String pendingWaitSlot;
         private long starvedSinceNanos;
-        private ArrayDeque<UUID> despawnQueue;
         private String despawnReason;
         private int despawnTicksLeft;
 
