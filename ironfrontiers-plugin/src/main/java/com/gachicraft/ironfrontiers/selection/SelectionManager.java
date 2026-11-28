@@ -603,7 +603,7 @@ public final class SelectionManager implements Listener, AutoCloseable {
         int count = Math.max(1, (int) Math.ceil(1.0 / maxStep));
         for (int i = 0; i < count; i++) {
             double offset = (i + 0.5) / count - 0.5;
-            player.spawnParticle(Particle.REDSTONE, x + offset, y, z, 1,
+            player.spawnParticle(Particle.DUST, x + offset, y, z, 1,
                     0, 0, 0, 0, new Particle.DustOptions(color, 1.0F));
         }
     }
