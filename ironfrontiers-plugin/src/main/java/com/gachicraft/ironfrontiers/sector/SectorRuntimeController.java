@@ -39,6 +39,7 @@ public final class SectorRuntimeController implements AutoCloseable {
     private final Map<String, SectorRuntimeState> states = new LinkedHashMap<>();
     private final Map<String, SectorStatePolicy> policies = new LinkedHashMap<>();
     private final Map<String, SectorOverride> overrides = new LinkedHashMap<>();
+    private final Set<String> deletingSectors = new HashSet<>();
 
     private SectorRegistry registry;
     private KpmTracker kpmTracker;
@@ -235,6 +236,7 @@ public final class SectorRuntimeController implements AutoCloseable {
             int online = playerCount.onlinePlayers();
             for (SectorDefinition definition : registry.sectors()) {
                 String key = normalize(definition.id());
+                if (deletingSectors.contains(key)) continue;
                 SectorRuntimeState current = states.get(key);
                 if (current == null) continue;
                 SectorStatePolicy policy = policies.get(key);
@@ -337,7 +339,9 @@ public final class SectorRuntimeController implements AutoCloseable {
         if (!started || registry == null) return CompletableFuture.completedFuture(null);
         List<CompletableFuture<Void>> writes = new ArrayList<>();
         for (SectorDefinition definition : registry.sectors()) {
-            SectorRuntimeState state = states.get(normalize(definition.id()));
+            String key = normalize(definition.id());
+            if (deletingSectors.contains(key)) continue;
+            SectorRuntimeState state = states.get(key);
             if (state != null) writes.add(persistState(definition, state));
         }
         return CompletableFuture.allOf(writes.toArray(CompletableFuture[]::new));
@@ -384,6 +388,72 @@ public final class SectorRuntimeController implements AutoCloseable {
         };
         processTransition(definition, new SectorTransition(kind, current, next));
         return true;
+    }
+
+    /**
+     * Deletes a sector from MySQL and removes it from the in-memory registry.
+     * Call on the primary thread after its YAML block has been removed.
+     */
+    public CompletableFuture<Void> deleteSector(String sectorId) {
+        ensureReady();
+        if (!server.isPrimaryThread()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Sector deletion must be initiated on the server thread"));
+        }
+        SectorDefinition definition = registry.get(sectorId).orElse(null);
+        if (definition == null) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("Unknown sector: " + sectorId));
+        }
+        String key = normalize(definition.id());
+        if (!deletingSectors.add(key)) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Sector deletion is already in progress: " + definition.id()));
+        }
+
+        CompletableFuture<Void> result = new CompletableFuture<>();
+        stateStore.deleteSector(definition.id()).whenComplete((ignored, error) -> {
+            Runnable finish = () -> {
+                if (error != null) {
+                    deletingSectors.remove(key);
+                    result.completeExceptionally(error);
+                    return;
+                }
+                try {
+                    states.remove(key);
+                    policies.remove(key);
+                    overrides.remove(key);
+                    kpmTracker.removeSector(definition.id());
+
+                    List<SectorDefinition> remaining = registry.sectors().stream()
+                            .filter(existing -> !normalize(existing.id()).equals(key))
+                            .toList();
+                    com.gachicraft.ironfrontiers.geometry.SectorGeometryIndex.Builder index =
+                            new com.gachicraft.ironfrontiers.geometry.SectorGeometryIndex.Builder();
+                    for (SectorDefinition existing : remaining) {
+                        index.add(existing.worldId(), existing.geometry());
+                    }
+                    registry = new SectorRegistry(remaining, index.build());
+                    deletingSectors.remove(key);
+                    result.complete(null);
+                    plugin.getLogger().info("Deleted sector " + definition.id()
+                            + " from runtime and MySQL");
+                } catch (RuntimeException exception) {
+                    deletingSectors.remove(key);
+                    result.completeExceptionally(exception);
+                }
+            };
+            if (server.isPrimaryThread()) finish.run();
+            else {
+                try {
+                    server.getScheduler().runTask(plugin, finish);
+                } catch (RuntimeException exception) {
+                    deletingSectors.remove(key);
+                    result.completeExceptionally(exception);
+                }
+            }
+        });
+        return result;
     }
 
     public CompletableFuture<Void> setThresholdOverride(String sectorId, String threshold, int valueTenths) {
