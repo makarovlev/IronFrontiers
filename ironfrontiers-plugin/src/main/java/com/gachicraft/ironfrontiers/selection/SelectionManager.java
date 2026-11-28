@@ -359,6 +359,14 @@ public final class SelectionManager implements Listener, AutoCloseable {
 
     private static List<GridPoint> normalize(List<GridPoint> source) {
         List<GridPoint> result = new ArrayList<>(source);
+        if (result.size() > 2) {
+            GridPoint first = result.getFirst();
+            boolean verticalLine = result.stream().allMatch(point -> point.x() == first.x());
+            boolean horizontalLine = result.stream().allMatch(point -> point.z() == first.z());
+            if (verticalLine || horizontalLine) {
+                return List.of(first, result.getLast());
+            }
+        }
         boolean changed;
         do {
             changed = false;
@@ -514,7 +522,8 @@ public final class SelectionManager implements Listener, AutoCloseable {
         }
         for (int i = 0; i < session.vertices.size() - 1 && budget[0] > 0; i++) {
             renderEdge(player, world, session.vertices.get(i), session.vertices.get(i + 1),
-                    session.referenceYs.get(i), session.referenceYs.get(i + 1), false, budget);
+                    session.referenceYs.get(i), session.referenceYs.get(i + 1),
+                    i == 0, i == session.vertices.size() - 2, budget);
         }
         if (budget[0] > 0) {
             renderColumn(player, world, session.vertices.getFirst().x(), session.vertices.getFirst().z(),
@@ -532,16 +541,21 @@ public final class SelectionManager implements Listener, AutoCloseable {
             GridPoint first = vertices.get(i);
             GridPoint second = vertices.get((i + 1) % vertices.size());
             renderEdge(player, world, first, second, world.getMaxHeight() - 1,
-                    world.getMaxHeight() - 1, i == 0, budget);
+                    world.getMaxHeight() - 1, false, false, budget);
         }
         if (budget[0] > 0) {
             GridPoint first = vertices.getFirst();
             renderColumn(player, world, first.x(), first.z(), world.getMaxHeight() - 1, Color.LIME, budget);
+            GridPoint last = vertices.getLast();
+            if (!last.equals(first)) {
+                renderColumn(player, world, last.x(), last.z(), world.getMaxHeight() - 1, Color.RED, budget);
+            }
         }
     }
 
     private void renderEdge(Player player, World world, GridPoint first, GridPoint second,
-                            int firstY, int secondY, boolean highlightStart, int[] budget) {
+                            int firstY, int secondY, boolean highlightStart,
+                            boolean highlightEnd, int[] budget) {
         int dx = Integer.compare(second.x(), first.x());
         int dz = Integer.compare(second.z(), first.z());
         int length = Math.abs(second.x() - first.x()) + Math.abs(second.z() - first.z());
@@ -565,7 +579,7 @@ public final class SelectionManager implements Listener, AutoCloseable {
             }
             double y = top.getAsDouble() + configs.config().getDouble("selection.ribbon_height_offset", 0.1);
             Color color = step == 0 && highlightStart ? Color.LIME
-                    : step == length ? Color.RED : Color.fromRGB(255, 190, 40);
+                    : step == length && highlightEnd ? Color.RED : Color.fromRGB(255, 190, 40);
             drawColumn(player, x + 0.5, z + 0.5, y, color);
             if (Double.isFinite(previousTop) && Math.abs(y - previousTop) > 0.05) {
                 double boundaryX = (previousX + x) / 2.0 + 0.5;
