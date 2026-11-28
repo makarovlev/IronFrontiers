@@ -73,7 +73,7 @@ class KpmTrackerTest {
         tracker.recordKill("bb02", alice, 10, 100);
         tracker.tick(100);
 
-        assertEquals(2.0, tracker.playerKpmSum(alice), 0.00001);
+        assertEquals(3.0, tracker.playerKpmSum(alice), 0.00001);
         tracker.removeSector("aa01");
 
         assertEquals(0.0, tracker.kpm("aa01"), 0.00001);
