@@ -434,7 +434,7 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
             queueChainWait(session, slot.anchor.slotId(), session.pendingChainDelaySeconds);
         }
 
-        int respawn = Math.max(1, slot.anchor.respawnSeconds());
+        int respawn = Math.max(0, slot.anchor.respawnSeconds());
         schedule(sessionTimerKey(session, slot, "cooldown"), respawn * 20L, () -> {
             if (session.despawning || slot.state != SlotState.COOLDOWN) return;
             slot.state = SlotState.IDLE;
