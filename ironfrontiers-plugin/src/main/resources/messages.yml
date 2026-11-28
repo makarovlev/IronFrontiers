@@ -35,6 +35,8 @@ sector:
     area: "<gray>Площадь: <white>{area}"
     stronghold: "<gray>Форпост: <white>{stronghold}"
   tp_done: "<green>Вы перемещены к сектору {sector}."
+  tp_failed: "<red>Не удалось найти безопасную точку телепортации в секторе {sector}."
+  delete_failed: "<red>Не удалось удалить сектор {sector}. Проверьте лог сервера."
   delete_prompt: "<yellow>Удалить сектор {sector} через {seconds} сек.? Выполните /if agree."
   delete_done: "<green>Сектор {sector} удалён."
   set_done: "<green>Для сектора {sector} параметр {what} установлен в {value}."
@@ -58,6 +60,7 @@ selection:
   err_intersects_sector: "<red>Территория пересекается с сектором {sector}."
   err_border: "<red>Точка находится за пределами WorldBorder."
   created: "<green>Сектор {sector} создан. Площадь: {area} клеток."
+  creation_failed: "<red>Не удалось создать сектор. Проверьте лог и корректность контура."
 confirm:
   none_pending: "<red>Нет ожидающей команды для подтверждения."
   expired: "<red>Время подтверждения истекло."
