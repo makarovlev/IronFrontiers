@@ -82,12 +82,11 @@ public final class SelectionManager implements Listener, AutoCloseable {
             return false;
         }
         SectorRuntimeController runtime = controller.get();
-        if (runtime == null || !runtime.registry().contains(sectorId)
-                && configs.sectors().getConfigurationSection("sectors." + sectorId) != null) {
-            send(player, "sector.name_exists", Map.of());
+        if (runtime == null) {
+            send(player, "general.db_unavailable", Map.of());
             return false;
         }
-        if (runtime != null && runtime.registry().contains(sectorId)) {
+        if (runtime.registry().contains(sectorId)) {
             send(player, "sector.name_exists", Map.of());
             return false;
         }
@@ -303,13 +302,15 @@ public final class SelectionManager implements Listener, AutoCloseable {
         }
 
         List<GridPoint> normalized = normalize(vertices);
-        String oldText;
+        String oldText = null;
+        boolean fileUpdated = false;
         Path file = plugin.getDataFolder().toPath().resolve("sectors.yml");
         try {
             oldText = Files.readString(file, StandardCharsets.UTF_8);
             String newText = YamlTextEditor.appendSectorBlock(oldText, session.sectorId,
                     sectorYaml(session, normalized));
             writeAtomically(file, newText);
+            fileUpdated = true;
 
             configs.reload(runtime.nonEnemySectorIds());
             runtime.reloadDefinitions();
@@ -317,23 +318,19 @@ public final class SelectionManager implements Listener, AutoCloseable {
                 throw new IllegalStateException("New sector failed validation and was not registered");
             }
         } catch (Exception exception) {
-            try {
-                if (Files.exists(file) && (oldText = Files.readString(file, StandardCharsets.UTF_8)) != null) {
-                    // A failed runtime reload must not leave a half-created sector in YAML.
-                    String current = Files.readString(file, StandardCharsets.UTF_8);
-                    if (current.contains("  " + session.sectorId + ":")) {
-                        // Remove only the new entry; preserve any concurrent administrator edits.
-                        writeAtomically(file, YamlTextEditor.removeSectorBlock(current, session.sectorId));
-                        configs.reload(runtime.nonEnemySectorIds());
-                        runtime.reloadDefinitions();
-                    }
+            if (fileUpdated && oldText != null) {
+                try {
+                    // Restore the exact previous text if parsing/registration failed.
+                    writeAtomically(file, oldText);
+                    configs.reload(runtime.nonEnemySectorIds());
+                    runtime.reloadDefinitions();
+                } catch (Exception rollbackError) {
+                    plugin.getLogger().severe("Could not roll back failed sector creation " + session.sectorId
+                            + ": " + rollbackError.getMessage());
                 }
-            } catch (Exception rollbackError) {
-                plugin.getLogger().severe("Could not roll back failed sector creation " + session.sectorId
-                        + ": " + rollbackError.getMessage());
             }
             plugin.getLogger().warning("Could not create sector " + session.sectorId + ": " + exception.getMessage());
-            send(player, "sector.name_invalid", Map.of());
+            send(player, "selection.creation_failed", Map.of());
             return;
         }
 
