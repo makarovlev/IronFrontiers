@@ -514,6 +514,11 @@ public final class SectorRuntimeController implements AutoCloseable {
         return policies.get(normalize(sectorId));
     }
 
+    public Optional<SectorOverride> override(String sectorId) {
+        ensureReady();
+        return Optional.ofNullable(overrides.get(normalize(sectorId)));
+    }
+
     public KpmTracker kpmTracker() {
         ensureReady();
         return kpmTracker;
