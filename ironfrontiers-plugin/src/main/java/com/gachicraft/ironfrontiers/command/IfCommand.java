@@ -165,7 +165,8 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
                 return;
             }
             messages.send(sender, "debug.state_set",
-                    Map.of("sector", args[2], "state", state.name()));
+                    Map.of("sector", args[2],
+                            "state", messages.raw("sector.states." + state.name().toLowerCase(Locale.ROOT))));
             return;
         }
 
@@ -198,12 +199,12 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
                     if (state == null || policy == null) continue;
                     Map<String, String> placeholders = Map.of(
                             "sector", sector.id() + " — " + sector.displayName(),
-                            "state", state.state().name(),
+                            "state", messages.raw("sector.states." + state.state().name().toLowerCase(Locale.ROOT)),
                             "kpm", formatKpm(controller.kpmTracker().kpm(sector.id())),
                             "capture", formatTenths(policy.captureTenths()),
                             "held", formatTenths(policy.effectiveHeldTenths()),
                             "players", Integer.toString(playersInside(controller, sector)),
-                            "stronghold", "NOT_BUILT");
+                            "stronghold", messages.raw("sector.stronghold.not_built"));
                     Component line = messages.component("sector.line", placeholders)
                             .clickEvent(ClickEvent.runCommand("/if sectors info " + sector.id()));
                     Component teleport = Component.text(" [tp]")
@@ -309,7 +310,9 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
                     return;
                 }
                 current.send(sender, "sector.set_done", Map.of(
-                        "sector", sector, "what", threshold, "value", formatTenths(tenths)));
+                        "sector", sector,
+                    "what", current.raw("sector.thresholds." + threshold),
+                    "value", formatTenths(tenths)));
             };
             runOnMain(reply);
         });
@@ -330,7 +333,8 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
         SectorStatePolicy policy = controller.policy(sector.id());
         messages.send(sender, "sector.info.header", Map.of("sector", sector.id()));
         messages.send(sender, "sector.info.world", Map.of("world", sector.worldName()));
-        messages.send(sender, "sector.info.state", Map.of("state", state.state().name()));
+        messages.send(sender, "sector.info.state", Map.of("state",
+                messages.raw("sector.states." + state.state().name().toLowerCase(Locale.ROOT))));
         messages.send(sender, "sector.info.kpm", Map.of(
                 "kpm", formatKpm(controller.kpmTracker().kpm(sector.id()))));
         messages.send(sender, "sector.info.capture", Map.of(
@@ -356,14 +360,15 @@ public final class IfCommand implements CommandExecutor, TabCompleter {
                 "seconds", Integer.toString(sector.destructionTimeSeconds())));
         messages.send(sender, "sector.info.occupation_time", Map.of(
                 "seconds", Integer.toString(sector.occupationTimeSeconds())));
-        messages.send(sender, "sector.info.stronghold", Map.of("stronghold", "NOT_BUILT"));
+        messages.send(sender, "sector.info.stronghold", Map.of(
+                "stronghold", messages.raw("sector.stronghold.not_built")));
     }
 
     private static String thresholdText(int configuredTenths, int effectiveTenths) {
         String configured = formatTenths(configuredTenths);
         String effective = formatTenths(effectiveTenths);
         return configuredTenths == effectiveTenths
-                ? effective : configured + " → " + effective + " (override/эффект)";
+                ? effective : configured + " → " + effective;
     }
 
     private static int playersInside(SectorRuntimeController controller, SectorDefinition sector) {
