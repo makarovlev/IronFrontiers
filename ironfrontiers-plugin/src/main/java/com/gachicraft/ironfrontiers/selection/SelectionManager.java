@@ -364,7 +364,21 @@ public final class SelectionManager implements Listener, AutoCloseable {
         return "display_name: '&6" + session.sectorId + "'\n"
                 + "world: \"" + session.worldName.replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n"
                 + "coords: " + coordinates + "\n"
-                + "mobs: {}";
+                + "mobs: {}\n"
+                + "# Optional sector-specific settings:\n"
+                + "# kpm_capture: 45.0\n"
+                + "# kpm_held: 23.0\n"
+                + "# safe_time: 3600\n"
+                + "# destruction_time: 300\n"
+                + "# occupation_time: 60\n"
+                + "# infinite_safe: false\n"
+                + "# replaces:\n"
+                + "#   biome: \\"BADLANDS,FOREST\\"\n"
+                + "#   blocks:\n"
+                + "#     rule_1: \\"SOUL_SAND,GRASS_BLOCK\\"\n"
+                + "# stronghold:\n"
+                + "#   blueprint: bp_stronghold_1\n"
+                + "#   center: \\"100,64,100\\"";
     }
 
     private static List<GridPoint> normalize(List<GridPoint> source) {
