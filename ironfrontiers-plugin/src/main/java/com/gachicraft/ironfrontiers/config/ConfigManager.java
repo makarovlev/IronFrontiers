@@ -287,8 +287,12 @@ public final class ConfigManager {
                     "stronghold.blueprint", "stronghold.center", "stronghold.npc",
                     "stronghold.npc_coord")) {
                 String path = base + "." + field;
-                if (!Objects.equals(old.get(path), next.get(path))) {
-                    next.set(path, old.get(path));
+                Object previousValue = YamlValueSnapshots.snapshot(old.get(path));
+                Object nextValue = YamlValueSnapshots.snapshot(next.get(path));
+                if (!Objects.equals(previousValue, nextValue)) {
+                    // Store a detached plain map for YAML sections; never attach a
+                    // ConfigurationSection owned by the previous configuration.
+                    next.set(path, previousValue);
                     changed.add(path);
                 }
             }
