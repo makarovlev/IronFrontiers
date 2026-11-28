@@ -36,7 +36,7 @@
 3. При KPM выше held порога по окончании safe_time сектор переходит в HELD; ниже порога — в DESTRUCTION.
 4. В DESTRUCTION удерживать KPM выше held порога в течение `destruction_cancel_hold_seconds`: переход обратно в HELD должен сохранить остаток таймера. Повторное падение в пределах `destruction_resume_window_seconds` использует этот остаток, а не новый полный таймер.
 5. Дождаться окончания DESTRUCTION: сектор становится ENEMY и получает occupation timer; debug kills в период оккупации не должны захватить сектор раньше времени.
-6. Создать почти одновременно DESTRUCTION/LOSS у двух секторов. Сообщения должны объединиться в одно multi-сообщение в рамках `messages.batch_window_seconds`; разные остатки destruction time должны формировать отдельные группы.
+6. Создать почти одновременно DESTRUCTION/LOSS у двух секторов. Сообщения должны объединиться в одно multi-сообщение в рамках `messages.batch_window_seconds`; разные остатки destruction time должны формировать отдельные группы. Получатели — онлайн-игроки во всех мирах сервера, в том числе вне `war_worlds`.
 7. При `freeze_when_empty: true` и нуле игроков SAFE/DESTRUCTION/occupation/resume timers должны стоять; после входа игрока отсчёт продолжится. Startup grace должен замораживать пути потери, но не мешать захвату ENEMY при достаточном KPM.
 8. Для `infinite_safe: true` сектор остаётся SAFE без обратного отсчёта.
 9. Выполнить `/if sectors set aa01 capture 5.0`; override должен сохраниться в `if_sector_override` и восстановиться после рестарта.
