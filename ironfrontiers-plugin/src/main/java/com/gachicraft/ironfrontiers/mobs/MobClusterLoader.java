@@ -1,6 +1,7 @@
 package com.gachicraft.ironfrontiers.mobs;
 
 import com.gachicraft.privatemobsx.api.MobType;
+import com.gachicraft.ironfrontiers.integration.MythicBridge;
 import org.bukkit.entity.EntityType;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -8,13 +9,20 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.logging.Logger;
+import java.util.function.Function;
 
 /** Parses mobs.yml without allowing one invalid cluster to disable other clusters. */
 public final class MobClusterLoader {
     private final Logger logger;
+    private final Function<String, MythicBridge.MobLookup> mythicLookup;
 
     public MobClusterLoader(Logger logger) {
+        this(logger, ignored -> MythicBridge.MobLookup.API_UNSUPPORTED);
+    }
+
+    public MobClusterLoader(Logger logger, Function<String, MythicBridge.MobLookup> mythicLookup) {
         this.logger = Objects.requireNonNull(logger);
+        this.mythicLookup = Objects.requireNonNull(mythicLookup);
     }
 
     public MobClusterRegistry load(YamlConfiguration yaml) {
@@ -49,6 +57,19 @@ public final class MobClusterLoader {
                     }
 
                     String mobId = required(entry, "mob");
+                    if (type == MobType.MYTHICMOBS) {
+                        MythicBridge.MobLookup lookup = mythicLookup.apply(mobId);
+                        if (lookup == MythicBridge.MobLookup.NOT_FOUND) {
+                            throw invalid(id, entryId, "MythicMobs mob id '" + mobId + "' was not found");
+                        }
+                        if (lookup == MythicBridge.MobLookup.PLUGIN_MISSING) {
+                            throw invalid(id, entryId, "MythicMobs is not installed");
+                        }
+                        if (lookup == MythicBridge.MobLookup.API_UNSUPPORTED) {
+                            logger.warning("mobs.yml clusters." + id + "." + entryId
+                                    + ": MythicMobs API lookup is unsupported; id validation was skipped");
+                        }
+                    }
                     if (!entry.isInt("amount")) throw invalid(id, entryId, "amount must be an integer");
                     int amount = entry.getInt("amount", -1);
                     if (amount < 1 || amount > 10) throw invalid(id, entryId, "amount must be 1..10");
