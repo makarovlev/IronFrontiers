@@ -100,9 +100,8 @@ public final class ConfirmationManager implements Listener, AutoCloseable {
     @Override
     public void close() {
         closed = true;
+        for (UUID playerId : pending.keySet()) timers.cancel(timerKey(playerId));
         pending.clear();
-        // Cancel only timers owned by this manager.
-        for (String key : pending.keySet()) timers.cancel(timerKey(UUID.fromString(key)));
     }
 
     private record Pending(Runnable action) { }
