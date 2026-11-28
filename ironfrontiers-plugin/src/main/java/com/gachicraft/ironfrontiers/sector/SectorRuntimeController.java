@@ -617,9 +617,10 @@ public final class SectorRuntimeController implements AutoCloseable {
                 state.resumeWindowLeftSeconds(), state.spawnPauseLeftSeconds(), state.version(), 0);
     }
 
-}
 
     /** Monotonic seconds from the same clock used by KPM windows. */
     public long currentMonotonicSecond() {
         return Math.max(0L, (System.nanoTime() - monotonicStartNanos) / 1_000_000_000L);
     }
+
+}
