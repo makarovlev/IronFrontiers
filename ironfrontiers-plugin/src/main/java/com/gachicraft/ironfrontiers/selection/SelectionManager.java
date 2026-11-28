@@ -93,11 +93,6 @@ public final class SelectionManager implements Listener, AutoCloseable {
             return false;
         }
         String worldName = player.getWorld().getName();
-        if (configs.config().getStringList("war_worlds").stream()
-                .noneMatch(name -> name.equalsIgnoreCase(worldName))) {
-            send(player, "selection.err_world", Map.of());
-            return false;
-        }
 
         sessions.remove(player.getUniqueId());
         // Remove inactive tools left after a quit/world change before issuing the new session tool.
