@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalDouble;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -574,7 +575,7 @@ public final class SelectionManager implements Listener, AutoCloseable {
                 double particleStep = Math.max(0.1,
                         configs.config().getDouble("selection.particle_step", 0.5));
                 for (double vertical = minY; vertical <= maxY; vertical += particleStep) {
-                    player.spawnParticle(Particle.REDSTONE, boundaryX, vertical, boundaryZ, 1,
+                    player.spawnParticle(Particle.DUST, boundaryX, vertical, boundaryZ, 1,
                             0, 0, 0, 0, new Particle.DustOptions(Color.fromRGB(255, 190, 40), 1.0F));
                 }
             }
