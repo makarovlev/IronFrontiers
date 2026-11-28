@@ -350,7 +350,7 @@ public final class SectorRuntimeController implements AutoCloseable {
     public boolean debugKill(String sectorId, int count, int weightTenths) {
         ensureReady();
         if (count < 1 || count > 10_000 || weightTenths < 1) return false;
-        if (!registry.contains(sectorId)) return false;
+        if (deletingSectors.contains(normalize(sectorId)) || !registry.contains(sectorId)) return false;
         long now = (System.nanoTime() - monotonicStartNanos) / 1_000_000_000L;
         for (int i = 0; i < count; i++) {
             kpmTracker.recordDebugKill(sectorId, weightTenths, now);
@@ -360,6 +360,7 @@ public final class SectorRuntimeController implements AutoCloseable {
 
     public boolean debugSetState(String sectorId, SectorState target) {
         ensureReady();
+        if (deletingSectors.contains(normalize(sectorId))) return false;
         Optional<SectorDefinition> optional = registry.get(sectorId);
         if (optional.isEmpty()) return false;
         SectorDefinition definition = optional.get();
@@ -420,11 +421,6 @@ public final class SectorRuntimeController implements AutoCloseable {
                     return;
                 }
                 try {
-                    states.remove(key);
-                    policies.remove(key);
-                    overrides.remove(key);
-                    kpmTracker.removeSector(definition.id());
-
                     List<SectorDefinition> remaining = registry.sectors().stream()
                             .filter(existing -> !normalize(existing.id()).equals(key))
                             .toList();
@@ -433,7 +429,14 @@ public final class SectorRuntimeController implements AutoCloseable {
                     for (SectorDefinition existing : remaining) {
                         index.add(existing.worldId(), existing.geometry());
                     }
-                    registry = new SectorRegistry(remaining, index.build());
+                    SectorRegistry nextRegistry = new SectorRegistry(remaining, index.build());
+
+                    // Publish the new registry only after its full geometry index is built.
+                    states.remove(key);
+                    policies.remove(key);
+                    overrides.remove(key);
+                    kpmTracker.removeSector(definition.id());
+                    registry = nextRegistry;
                     deletingSectors.remove(key);
                     result.complete(null);
                     plugin.getLogger().info("Deleted sector " + definition.id()
@@ -463,6 +466,8 @@ public final class SectorRuntimeController implements AutoCloseable {
         SectorDefinition definition = registry.get(sectorId).orElseThrow(
                 () -> new IllegalArgumentException("Unknown sector: " + sectorId));
         String key = normalize(definition.id());
+        if (deletingSectors.contains(key)) return CompletableFuture.failedFuture(
+                new IllegalStateException("Sector is being deleted: " + definition.id()));
         SectorOverride previous = overrides.get(key);
         Integer capture = previous == null ? null : previous.captureTenths();
         Integer held = previous == null ? null : previous.heldTenths();
