@@ -9,7 +9,9 @@ import com.gachicraft.ironfrontiers.integration.IntegrationRegistry;
 import com.gachicraft.ironfrontiers.sector.*;
 import com.gachicraft.ironfrontiers.storage.*;
 import com.gachicraft.ironfrontiers.util.CentralTimerScheduler;
-import com.gachicraft.ironfrontiers.mobs.NoopMobSpawn;
+import com.gachicraft.ironfrontiers.mobs.PrivateMobsBridge;
+import com.gachicraft.ironfrontiers.mobs.ServicesPrivateMobsBridge;
+import com.gachicraft.ironfrontiers.mobs.SpawnDirector;
 import com.gachicraft.ironfrontiers.selection.SelectionManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -29,6 +31,8 @@ public final class IronFrontiers extends JavaPlugin {
     private SectorRuntimeController sectorController;
     private SelectionManager selectionManager;
     private ConfirmationManager confirmationManager;
+    private ServicesPrivateMobsBridge privateMobsBridge;
+    private SpawnDirector spawnDirector;
     private boolean databaseReady;
     private boolean databaseInitializationInProgress;
     private boolean initialDatabaseAttempt = true;
@@ -54,8 +58,13 @@ public final class IronFrontiers extends JavaPlugin {
 
             selectionManager = new SelectionManager(this, configs, timers, () -> sectorController);
             confirmationManager = new ConfirmationManager(this, configs, timers);
+            privateMobsBridge = new ServicesPrivateMobsBridge(this);
+            spawnDirector = new SpawnDirector(this, configs, timers, privateMobsBridge, () -> sectorController);
+            services.register(PrivateMobsBridge.class, privateMobsBridge);
+            services.register(SpawnDirector.class, spawnDirector);
             getServer().getPluginManager().registerEvents(selectionManager, this);
             getServer().getPluginManager().registerEvents(confirmationManager, this);
+            getServer().getPluginManager().registerEvents(spawnDirector, this);
 
             Authority authority = new AlwaysLeader();
             PlayerCountSource playerCount = new LocalPlayerCountSource(getServer());
@@ -68,8 +77,8 @@ public final class IronFrontiers extends JavaPlugin {
             integrations.logAvailability(getLogger());
             services.register(IntegrationRegistry.class, integrations);
 
-            if (getServer().getPluginManager().isPluginEnabled("PrivateMobsX")) {
-                getLogger().info("PrivateMobsX detected; its public API will be connected in stage 3B.");
+            if (!privateMobsBridge.isAvailable()) {
+                throw new IllegalStateException("PrivateMobsX is enabled but did not register its public API service");
             }
 
             // Register early so /if reload and the database-unavailable message work
@@ -134,7 +143,7 @@ public final class IronFrontiers extends JavaPlugin {
                                     this, configs, reliableStore, timers,
                                     services.require(Authority.class),
                                     services.require(PlayerCountSource.class),
-                                    new NoopMobSpawn());
+                                    spawnDirector);
                             controller.initialize(definitions.registry(), loaded.states(), loaded.overrides());
 
                             database = new DatabaseHandle(handle.dataSource(), reliableStore);
@@ -148,6 +157,7 @@ public final class IronFrontiers extends JavaPlugin {
                                     controller.kpmTracker());
 
                             databaseReady = true;
+                            spawnDirector.start();
                             nextDatabaseRetrySeconds = 5;
                             getLogger().info("MySQL connected; loaded " + loaded.states().size()
                                     + " persisted sector state(s), " + loaded.overrides().size() + " KPM override(s)");
@@ -198,6 +208,7 @@ public final class IronFrontiers extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (spawnDirector != null) spawnDirector.close();
         if (selectionManager != null) selectionManager.close();
         if (confirmationManager != null) confirmationManager.close();
         CompletableFuture<Void> finalFlush = null;
