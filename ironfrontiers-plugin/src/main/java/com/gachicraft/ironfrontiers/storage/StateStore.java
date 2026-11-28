@@ -9,5 +9,6 @@ public interface StateStore extends AutoCloseable {
     CompletableFuture<Void> save(SectorPersistentState state);
     CompletableFuture<List<SectorOverride>> loadOverrides();
     CompletableFuture<Void> saveOverride(SectorOverride override);
+    CompletableFuture<Void> deleteSector(String sectorId);
     @Override void close();
 }

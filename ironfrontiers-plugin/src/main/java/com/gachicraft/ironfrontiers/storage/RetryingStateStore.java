@@ -27,6 +27,8 @@ public final class RetryingStateStore implements StateStore {
     private final CentralTimerScheduler timers;
     private final Object lock = new Object();
     private final Map<String, PendingWrite> pending = new LinkedHashMap<>();
+    private final java.util.Set<String> deleting = new java.util.HashSet<>();
+    private CompletableFuture<Void> activeFlush = CompletableFuture.completedFuture(null);
     private final AtomicBoolean retryScheduled = new AtomicBoolean();
     private final AtomicBoolean flushInProgress = new AtomicBoolean();
     private volatile boolean closed;
@@ -62,8 +64,14 @@ public final class RetryingStateStore implements StateStore {
         if (closed) return CompletableFuture.failedFuture(new IllegalStateException("StateStore is closed"));
 
         CompletableFuture<Void> result = new CompletableFuture<>();
+        String key = normalizeSectorId(state.sectorId());
         synchronized (lock) {
-            PendingWrite write = pending.get(state.sectorId());
+            if (deleting.contains(key)) {
+                result.completeExceptionally(new IllegalStateException(
+                        "Sector is being deleted: " + state.sectorId()));
+                return result;
+            }
+            PendingWrite write = pending.get(key);
             if (write == null) {
                 if (pending.size() >= MAX_PENDING_SECTORS) {
                     result.completeExceptionally(new IllegalStateException(
@@ -72,7 +80,7 @@ public final class RetryingStateStore implements StateStore {
                     return result;
                 }
                 write = new PendingWrite(state);
-                pending.put(state.sectorId(), write);
+                pending.put(key, write);
             } else {
                 write.revision++;
                 write.state = state;
@@ -84,16 +92,43 @@ public final class RetryingStateStore implements StateStore {
         return result;
     }
 
+    @Override
+    public CompletableFuture<Void> deleteSector(String sectorId) {
+        if (closed) return CompletableFuture.failedFuture(
+                new IllegalStateException("StateStore is closed"));
+        String key = normalizeSectorId(sectorId);
+        PendingWrite removed;
+        CompletableFuture<Void> inFlight;
+        synchronized (lock) {
+            if (!deleting.add(key)) return CompletableFuture.failedFuture(
+                    new IllegalStateException("Sector deletion is already in progress: " + sectorId));
+            removed = pending.remove(key);
+            inFlight = activeFlush;
+        }
+        if (removed != null) {
+            IllegalStateException cancelled = new IllegalStateException(
+                    "Pending sector state write cancelled because the sector is being deleted: " + sectorId);
+            removed.waiters.forEach(waiter -> waiter.future.completeExceptionally(cancelled));
+        }
+        return inFlight.handle((ignored, error) -> null)
+                .thenCompose(ignored -> delegate.deleteSector(sectorId))
+                .whenComplete((ignored, error) -> {
+                    synchronized (lock) { deleting.remove(key); }
+                });
+    }
+
     private void flushPending() {
         // Shutdown still permits a final bounded flush before the DB executor is closed.
         if (closed || !flushInProgress.compareAndSet(false, true)) return;
 
         List<Snapshot> batch = new ArrayList<>(BATCH_SIZE);
+        CompletableFuture<Void> thisFlush = new CompletableFuture<>();
         synchronized (lock) {
             for (PendingWrite write : pending.values()) {
                 batch.add(new Snapshot(write, write.state, write.revision));
                 if (batch.size() == BATCH_SIZE) break;
             }
+            if (!batch.isEmpty()) activeFlush = thisFlush;
         }
 
         if (batch.isEmpty()) {
@@ -107,13 +142,17 @@ public final class RetryingStateStore implements StateStore {
 
         CompletableFuture.allOf(writes).whenComplete((ignored, aggregateError) -> {
             flushInProgress.set(false);
-            if (closed) return;
 
             boolean failed = false;
             for (CompletableFuture<Boolean> write : writes) {
                 try { if (!write.join()) failed = true; }
                 catch (RuntimeException exception) { failed = true; }
             }
+
+            // Deletion waits for this exact in-flight batch before deleting rows,
+            // so an older asynchronous upsert cannot resurrect a removed sector.
+            thisFlush.complete(null);
+            if (closed) return;
 
             boolean hasPending;
             synchronized (lock) { hasPending = !pending.isEmpty(); }
@@ -143,7 +182,8 @@ public final class RetryingStateStore implements StateStore {
         List<CompletableFuture<Void>> completed = new ArrayList<>();
         synchronized (lock) {
             if (closed) return;
-            PendingWrite current = pending.get(snapshot.state.sectorId());
+            String key = normalizeSectorId(snapshot.state.sectorId());
+            PendingWrite current = pending.get(key);
             if (current != snapshot.pending) return;
 
             Iterator<Waiter> iterator = current.waiters.iterator();
@@ -155,7 +195,7 @@ public final class RetryingStateStore implements StateStore {
                 }
             }
             if (current.revision == snapshot.revision) {
-                pending.remove(snapshot.state.sectorId());
+                pending.remove(key);
             }
         }
         completed.forEach(future -> future.complete(null));
@@ -214,6 +254,13 @@ public final class RetryingStateStore implements StateStore {
                 "Plugin disabled before queued state writes could be persisted");
         waiters.forEach(future -> future.completeExceptionally(failure));
         delegate.close();
+    }
+
+    private static String normalizeSectorId(String sectorId) {
+        if (sectorId == null || sectorId.isBlank()) {
+            throw new IllegalArgumentException("sectorId must not be blank");
+        }
+        return sectorId.toLowerCase(java.util.Locale.ROOT);
     }
 
     private static final class PendingWrite {

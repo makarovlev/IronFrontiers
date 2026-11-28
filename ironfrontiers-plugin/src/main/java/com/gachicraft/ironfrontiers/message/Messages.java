@@ -51,6 +51,8 @@ public final class Messages {
         };
     }
 
+    public String raw(String key) { return source.getString(key, ""); }
+
     public Component component(String key) { return component(key, Map.of()); }
     public void send(CommandSender sender, String key) { sender.sendMessage(component(key)); }
     public void send(CommandSender sender, String key, Map<String, String> placeholders) {

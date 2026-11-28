@@ -66,6 +66,25 @@ class KpmTrackerTest {
     }
 
     @Test
+    void removingSectorClearsAggregateAndPersonalWindows() {
+        UUID alice = UUID.randomUUID();
+        KpmTracker tracker = new KpmTracker(List.of("aa01", "bb02"), 60, 120);
+        tracker.recordKill("aa01", alice, 20, 100);
+        tracker.recordKill("bb02", alice, 10, 100);
+        tracker.tick(100);
+
+        assertEquals(3.0, tracker.playerKpmSum(alice), 0.00001);
+        tracker.removeSector("aa01");
+
+        assertEquals(0.0, tracker.kpm("aa01"), 0.00001);
+        assertTrue(tracker.snapshot("aa01").isEmpty());
+        assertEquals(0.0, tracker.playerKpm(alice, "aa01"), 0.00001);
+        assertEquals(1.0, tracker.playerKpm(alice, "bb02"), 0.00001);
+        assertEquals(1.0, tracker.playerKpmSum(alice), 0.00001);
+        assertFalse(tracker.snapshots().containsKey("aa01"));
+    }
+
+    @Test
     void publishesImmutableSnapshots() {
         KpmTracker tracker = new KpmTracker(List.of("aa01"), 60, 120);
         tracker.tick(100);

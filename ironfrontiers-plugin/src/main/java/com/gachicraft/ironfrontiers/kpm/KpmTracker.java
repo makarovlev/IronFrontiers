@@ -58,6 +58,35 @@ public final class KpmTracker implements KpmSource {
         sectorWindows.computeIfAbsent(key, ignored -> new KpmWindow(windowSeconds));
     }
 
+    /** Removes every aggregate and personal window belonging to a deleted sector. */
+    public void removeSector(String sectorId) {
+        String key = normalize(sectorId);
+        sectorWindows.remove(key);
+
+        Iterator<Map.Entry<UUID, Map<String, PersonalWindow>>> players = personalWindows.entrySet().iterator();
+        while (players.hasNext()) {
+            Map<String, PersonalWindow> bySector = players.next().getValue();
+            bySector.remove(key);
+            if (bySector.isEmpty()) players.remove();
+        }
+
+        Map<String, SectorKpmSnapshot> sectors = new HashMap<>(sectorSnapshots.get());
+        sectors.remove(key);
+        sectorSnapshots.set(Map.copyOf(sectors));
+
+        PersonalKpmSnapshot previous = personalSnapshot.get();
+        Map<PersonalKpmSnapshot.PlayerSectorKey, Double> byPlayerAndSector = new HashMap<>();
+        Map<UUID, Double> totals = new HashMap<>();
+        previous.byPlayerAndSector().forEach((entryKey, value) -> {
+            if (!key.equals(entryKey.sectorId())) {
+                byPlayerAndSector.put(entryKey, value);
+                totals.merge(entryKey.playerId(), value, Double::sum);
+            }
+        });
+        personalSnapshot.set(new PersonalKpmSnapshot(
+                previous.timeSeconds(), byPlayerAndSector, totals));
+    }
+
     /** Records a real owner kill and its weighted contribution to sector and player KPM. */
     public void recordKill(String sectorId, UUID playerId, int weightTenths, long nowSecond) {
         if (playerId == null) {
