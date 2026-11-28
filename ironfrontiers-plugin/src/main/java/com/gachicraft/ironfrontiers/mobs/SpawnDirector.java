@@ -135,7 +135,7 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
             for (SectorDefinition sector : registry.sectorsNear(world.getUID(), x, z, triggerDistance)) {
                 if (sector.spawnAnchors().isEmpty()) continue;
                 SessionKey key = new SessionKey(player.getUniqueId(), normalize(sector.id()));
-                PlayerSession session = sessions.computeIfAbsent(key, ignored -> new PlayerSession(sector));
+                PlayerSession session = sessions.computeIfAbsent(key, ignored -> new PlayerSession(sector, key));
                 if (session.despawning || !session.armed) continue;
                 if (!sameAnchors(session.sector, sector)) {
                     beginDespawn(session, "API");
@@ -374,6 +374,8 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
         next.state = SlotState.WAIT;
         session.pendingWaitSlot = next.anchor.slotId();
         session.pendingChain = false;
+        session.starved = false;
+        session.starvedSinceNanos = 0;
         schedule(sessionTimerKey(session, next, "wait"), delaySeconds * 20L,
                 () -> attemptWaitingSlot(session, next));
     }
@@ -426,6 +428,12 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
     private void completeSlot(PlayerSession session, SlotSession slot) {
         if (slot.state != SlotState.ACTIVE || !slot.mobs.isEmpty()) return;
         slot.state = SlotState.COOLDOWN;
+        // A pending chain step is reserved first, so the immediate D-spawn below
+        // cannot consume the slot that must remain in WAIT.
+        if (session.pendingChain && !hasWaitingSlot(session)) {
+            queueChainWait(session, slot.anchor.slotId(), session.pendingChainDelaySeconds);
+        }
+
         int respawn = Math.max(1, slot.anchor.respawnSeconds());
         schedule(sessionTimerKey(session, slot, "cooldown"), respawn * 20L, () -> {
             if (session.despawning || slot.state != SlotState.COOLDOWN) return;
@@ -439,7 +447,12 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
                 Player owner = Bukkit.getPlayer(session.key.owner);
                 if (owner != null) {
                     SlotSession next = nearestEligibleSlot(session, owner, null);
-                    if (next != null) spawnSlot(session, next, owner);
+                    if (next != null) {
+                        if (spawnSlot(session, next, owner)) session.starved = false;
+                    } else if (!hasWaitingSlot(session)) {
+                        session.starved = true;
+                        session.starvedSinceNanos = System.nanoTime();
+                    }
                 }
             }
         });
@@ -447,9 +460,10 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
         Player owner = Bukkit.getPlayer(session.key.owner);
         if (owner != null) {
             SlotSession next = nearestEligibleSlot(session, owner, null);
-            if (next != null) {
-                spawnSlot(session, next, owner);
-            } else {
+            if (next != null && spawnSlot(session, next, owner)) {
+                session.starved = false;
+                session.starvedSinceNanos = 0;
+            } else if (!hasWaitingSlot(session)) {
                 session.starved = true;
                 session.starvedSinceNanos = System.nanoTime();
             }
@@ -698,10 +712,6 @@ public final class SpawnDirector implements MobSpawn, Listener, AutoCloseable {
             for (SpawnAnchor anchor : sector.spawnAnchors()) {
                 slots.put(anchor.slotId(), new SlotSession(anchor));
             }
-        }
-
-        private PlayerSession(SectorDefinition sector) {
-            this(sector, null);
         }
     }
 }
